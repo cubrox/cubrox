@@ -165,9 +165,9 @@ TEMPLATE: Fill in project-specific details below when using this template.
 ### Project Information
 
 - **License**: BSL 1.1 (converts to Apache 2.0 after 3 years per release)
-- **Project Name**: [Your project name]
-- **Repository**: [GitHub repo URL]
-- **Project Board**: [GitHub project board URL]
+- **Project Name**: Cubrox
+- **Repository**: https://github.com/vibeacademy/cubrox
+- **Project Board**: TBD (created in Phase 4 — `/bootstrap-workflow`)
 - **Tech Stack**: FastAPI + Jinja2 + HTMX on Python 3.12
 - **Database layer**: SQLModel + Alembic
 - **Platform**: Google Cloud Platform (Cloud Run)
@@ -175,7 +175,12 @@ TEMPLATE: Fill in project-specific details below when using this template.
 - **Container Registry**: Artifact Registry
 - **Secrets**: Google Secret Manager
 - **Package manager**: uv
-- **Organization**: [GitHub org name]
+- **Organization**: vibeacademy
+- **LLM**: Anthropic Claude API (`claude-haiku-4-5` for comprehension questions, with prompt caching + Postgres result cache)
+- **Email**: Resend (passwordless magic-link auth)
+- **PDF**: pdfplumber, in-process, ≤25 MB
+- **Observability**: Google Cloud Logging + Error Reporting
+- **Architecture doc**: `docs/TECHNICAL-ARCHITECTURE.md`
 
 ### Build & Test Commands
 

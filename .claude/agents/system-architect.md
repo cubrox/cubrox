@@ -433,28 +433,105 @@ Use the **ATAM (Architecture Tradeoff Analysis Method)**:
 
 ## Project-Specific Domain Analysis
 
-<!--
-TEMPLATE: Fill in project-specific domain analysis here when using this template.
+**Source documents:** [docs/PRODUCT-REQUIREMENTS.md](../../docs/PRODUCT-REQUIREMENTS.md), [docs/PRODUCT-ROADMAP.md](../../docs/PRODUCT-ROADMAP.md), [docs/TECHNICAL-ARCHITECTURE.md](../../docs/TECHNICAL-ARCHITECTURE.md), [.claude/PROJECT.md](../PROJECT.md).
 
-Example structure:
+The project is a **modular monolith**, not a microservices system. Bounded contexts below are conceptual seams within one FastAPI process — they shape module boundaries (`app/services/<context>/`) and review heuristics, not deployment units.
+
 ### Bounded Contexts
 
-#### 1. [Context Name]
+#### 1. Identity
 **Aggregates:**
-- `Entity` (root) → `ChildEntity1`, `ChildEntity2`
+- `User` (root) → `MagicLinkToken`, `Session`
 
 **Value Objects:**
-- `ValueObject1`, `ValueObject2`
+- `Email` (citext-stored, normalized lowercase), `MagicToken` (32-byte URL-safe; stored as SHA-256 hash; 15-min TTL; single-use), `SessionCookie` (signed via `itsdangerous`; `HttpOnly`, `Secure`, `SameSite=Lax`; 30-day rolling)
 
 **Domain Events:**
-- `Event1`, `Event2`
+- `MagicLinkRequested` (triggers Resend send), `MagicLinkConsumed` (invalidates outstanding tokens; mints session), `SessionEstablished`
 
 **Ubiquitous Language:**
-- Term1, Term2, Term3
+- *Account*, *Magic link*, *Session*. Never *password*, *signup* (we say *first sign-in*), or *bot user*.
+
+#### 2. Reading Surface
+**Aggregates:**
+- `Preference` (root, one per user) — keyed JSONB store of reading-support choices
+- `Passage` (root) → text content, source metadata, text hash
+
+**Value Objects:**
+- `ReadingMode` (font, size, line-height, contrast, max-width, bionic-on/off), `PassageHash` (SHA-256 of text content; cache key)
+
+**Domain Events:**
+- `PreferenceUpdated` (single-key swap; triggers `<style>` fragment swap), `PassageOpened`, `PassageClosed` (emits `ReadingEvent` for the metric)
+
+**Ubiquitous Language:**
+- *Reading surface* (the rendered page), *Reading-support mode* (a configurable transformation), *Bionic emphasis* (server-side first-N-chars-bold transform). Never *theme* (too generic), *style preset* (we don't ship presets — every choice is per-user).
+
+#### 3. Comprehension
+**Aggregates:**
+- `ComprehensionQuestionCache` (root, keyed by passage hash + question_type + model_id + prompt_version)
+
+**Value Objects:**
+- `QuestionType` (e.g. `recall`, `summary`, `inference`), `PromptVersion` (integer; bump invalidates cache)
+
+**Domain Events:**
+- `QuestionsRequested` (cache lookup), `QuestionsGenerated` (LLM call completed; cache populated)
+
+**Ubiquitous Language:**
+- *Comprehension check*, *Question type*. Never *quiz* (implies grading) or *test* (clinical connotation).
+
+**External dependency:** Anthropic Claude API (model `claude-haiku-4-5`). All access goes through `app/services/comprehension/generator.py`, which enforces (a) cache-first lookup, (b) input cap of 4,000 tokens, (c) prompt caching on the system message. Direct `anthropic.Anthropic()` calls outside this module are an architecture violation.
+
+#### 4. Ingestion
+**Aggregates:**
+- (Stateless) — accepts raw input, produces a `Passage` in the Reading Surface context
+
+**Value Objects:**
+- `RawPaste` (text), `UploadedPdf` (≤25 MB, `application/pdf`)
+
+**Domain Events:**
+- `PassageIngested` (success), `IngestionFailed` (surfaces error to user per Risk #3)
+
+**Ubiquitous Language:**
+- *Ingest*, *Parse* (PDF → text). Never *import* (implies bulk) or *upload* alone (ambiguous: is the file the goal or the text?).
+
+**Implementation constraint:** PDF parsing uses `pdfplumber` only. PyMuPDF is forbidden by ADR-003 (AGPL conflict with BSL release path).
 
 ### Context Mapping
-[Diagram showing how contexts relate to each other]
--->
+
+```
+   Identity ──── (provides current_user) ────┐
+                                              │
+                                              ▼
+   Ingestion ────(produces Passage)────► Reading Surface ◄────(consumes Passage)──── Comprehension
+                                              │                          │
+                                              │ emits ReadingEvent       │ calls Anthropic API
+                                              ▼                          ▼
+                                      [reading_event tbl]         [Anthropic Claude Haiku 4.5]
+                                              │                          │
+                                              ▼                          │
+                                       100k-line metric                  │
+                                                                         ▼
+                                                         [comprehension_question_cache tbl]
+```
+
+All four contexts share one Postgres database (Neon) and one Cloud Run process. The seams are enforced at the module level (`app/services/identity/`, `app/services/reading/`, `app/services/comprehension/`, `app/services/ingestion/`) and at the route level (one router per context under `app/api/`). Cross-context calls are direct function calls, not HTTP — but they should pass identifiers, not entities, so a future split would only require swapping the import for an HTTP client.
+
+### Architecture patterns in use
+
+- **Server-rendered HTML + HTMX fragment swaps** (ADR-005). No SPA. Same handler returns a full Jinja page or a fragment based on `HX-Request: true`.
+- **Cache-aside with content-addressable keys** for LLM responses. Postgres-backed; no Redis in MVP.
+- **Passwordless auth via signed, single-use tokens** (ADR-002). Hand-rolled (~50 LOC) rather than dragging in a heavy auth framework.
+- **Per-PR ephemeral environments** with Neon branching. The `preview-deploy.yml` workflow creates a Neon branch per PR; `preview-cleanup.yml` deletes it on close.
+
+### Key technical decisions
+
+See ADRs in [docs/TECHNICAL-ARCHITECTURE.md §Architecture Decision Records](../../docs/TECHNICAL-ARCHITECTURE.md):
+
+- ADR-001: Anthropic Claude Haiku for comprehension questions (with prompt + Postgres caching)
+- ADR-002: Passwordless magic-link authentication
+- ADR-003: pdfplumber over PyMuPDF (license cleanliness)
+- ADR-004: Cloud Logging + Error Reporting (defer Sentry to Phase 2)
+- ADR-005: HTMX + server rendering, no SPA
 
 ## Communication Style
 

@@ -30,15 +30,15 @@ You are a Senior Full-Stack Engineer. Your primary responsibility is to autonomo
 
 ## Project Context
 
-<!--
-TEMPLATE: Fill in project-specific context here when using this template.
-
-Example fields to populate:
-- **Platform(s)**: [Web, Mobile, Desktop, etc.]
-- **Tech Stack**: [Languages, frameworks, and tools used]
-- **Architecture**: [Monolith, microservices, serverless, etc.]
-- **Key Quality Standards**: [Performance, accessibility, security requirements]
--->
+- **Product**: Cubrox — a WCAG-conformant reading surface for neurodivergent readers of Baha'i writings. See [docs/PRODUCT-REQUIREMENTS.md](../../docs/PRODUCT-REQUIREMENTS.md).
+- **Platform**: Single web app on GCP Cloud Run (us-east1, scale-to-zero). Per-PR ephemeral environments with isolated Neon Postgres branches.
+- **Tech stack**: Python 3.12 / FastAPI + Uvicorn / Jinja2 / HTMX 2.x (CDN, no build step) / SQLModel + Alembic / psycopg 3 / pdfplumber / Anthropic Python SDK / Resend / `itsdangerous`. Package manager: **uv** (never `pip`).
+- **Architecture**: Modular monolith — single FastAPI process. No microservices, no SPA, no JavaScript build. Full architecture: [docs/TECHNICAL-ARCHITECTURE.md](../../docs/TECHNICAL-ARCHITECTURE.md).
+- **Key non-functional requirements**:
+  - **WCAG conformance is a defining product requirement** (PRD), not a checkbox. Accessibility regressions on the reading surface are blocking.
+  - **<100 ms perceived latency** for in-page view changes (preference toggles, fragment swaps).
+  - **Per-user configurability** — every reading transformation is a per-user preference; never ship a "one-size accessible default."
+- **Domain context**: All user data (passages, preferences, reading events) is private to the owning user. Authorization is enforced in route handlers via `WHERE user_id = current_user.id` — there is no admin role and no cross-user reads.
 
 ## Tools and Capabilities
 
@@ -135,26 +135,44 @@ ask the user to run `gh auth login` (solo) or
 
 You must strictly adhere to the project's architecture and coding standards defined in `CLAUDE.md`.
 
-<!--
-TEMPLATE: Fill in project-specific implementation standards here.
+**Technology stack:**
+- Python 3.12 (pinned in `.python-version` and `pyproject.toml`)
+- FastAPI + Uvicorn, async by default
+- SQLModel for ORM; Alembic for migrations (every schema change ships with one migration in the same PR)
+- Jinja2 templates; HTMX 2.x for interactivity; Pico.css 2.x for baseline styling
+- psycopg 3 with binary + pool extras
+- `anthropic` SDK (LLM), `resend` SDK (email), `pdfplumber` (PDF), `itsdangerous` (sessions)
+- Package management: **uv only**. `uv add <pkg>` to add a runtime dep, `uv add --dev <pkg>` for dev.
 
-Example sections:
-**Technology Stack:**
-- [Language and version]
-- [Framework]
-- [Build tooling]
-- [Testing framework]
+**Code quality:**
+- **Lint + format**: `uv run ruff check .` and `uv run ruff format .`. Ruff config in `pyproject.toml` (line-length 100; rules `E F I W B UP`).
+- **Type check**: `uv run mypy app/`. `check_untyped_defs = true`. New code should be fully typed.
+- **Naming**: `snake_case` modules and functions, `PascalCase` for SQLModel classes, `UPPER_SNAKE` for constants. Module names singular (`app/models/passage.py`, not `passages.py`).
+- **Comments**: only when the *why* is non-obvious. No what-comments. No "added for ticket #N" — that belongs in the PR description.
+- **Imports**: stdlib → third-party → local; ruff isort handles the ordering.
 
-**Code Quality:**
-- [Type safety requirements]
-- [Code style guidelines]
-- [Documentation standards]
+**Testing requirements:**
+- `uv run pytest` (must pass before every push)
+- `uv run pytest --cov=app --cov-report=term-missing` — **coverage threshold: 80%** on `app/`
+- HTTP tests use `fastapi.testclient.TestClient` with the `get_session` dependency overridden to yield a fresh in-memory SQLite session per test. Pattern documented in [docs/TECHNICAL-ARCHITECTURE.md](../../docs/TECHNICAL-ARCHITECTURE.md#fastapi-testing).
+- HTMX endpoints: assert on HTML substrings. **Fragment responses must NOT include `<html`** — assert this explicitly to catch accidental full-page returns.
+- LLM call sites: **mock the `anthropic.Anthropic` client**. Never hit the real API in CI. Real-API tests, if any, live under `tests/integration/` and are env-var-gated.
+- Accessibility tests for the reading surface use Playwright + `@axe-core/playwright` under `tests/a11y/`.
 
-**Testing Requirements:**
-- [Test types required]
-- [Coverage thresholds]
-- [Pre-commit checks]
--->
+**Pre-push checks (REQUIRED — see CLAUDE.md):**
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+- `uv run mypy app/`
+- `uv run pytest`
+The pre-push hook at `scripts/hooks` runs these automatically when `git config core.hooksPath scripts/hooks` is set. **Never use `git push --no-verify`** — fix the failing check.
+
+**Stack-specific pitfalls to avoid:**
+- Do not import `pymupdf` / `fitz`. PyMuPDF is AGPL and incompatible with the project's BSL 1.1 → Apache 2.0 release path. Use `pdfplumber`. (ADR-003.)
+- Do not call the Anthropic API without (a) checking the `comprehension_question_cache` table first, (b) capping input at 4,000 tokens, and (c) using prompt caching on the system message. Unbounded LLM cost is a blocking review finding.
+- Do not return a full Jinja page from a route that's serving an HTMX request. Switch templates on `HX-Request: true`.
+- Do not hardcode application URLs (CLAUDE.md rule #8). Use `request.headers["x-forwarded-host"]` server-side or `window.location.origin` client-side so PR previews work.
+- Do not put secrets in source. Add to Secret Manager and inject as Cloud Run env vars; reference via `pydantic-settings`.
+- Do not skip writing an Alembic migration for schema changes; the deploy workflow runs `alembic upgrade head` against production.
 
 ### 4. Pull Request Creation
 

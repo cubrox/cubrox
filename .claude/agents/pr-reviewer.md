@@ -49,14 +49,15 @@ You are a Staff Engineer and Tech Lead responsible for maintaining the highest q
 
 ## Project Context
 
-<!--
-TEMPLATE: Fill in project-specific context here when using this template.
-
-Example fields to populate:
-- **Platform(s)**: [Web, Mobile, Desktop, etc.]
-- **Tech Stack**: [Languages, frameworks, and tools used]
-- **Quality Standards**: [Performance, accessibility, security requirements]
--->
+- **Product**: Cubrox — a WCAG-conformant reading surface for neurodivergent readers. See [docs/PRODUCT-REQUIREMENTS.md](../../docs/PRODUCT-REQUIREMENTS.md).
+- **Platform**: Single FastAPI app on GCP Cloud Run; Neon Postgres with per-PR branches.
+- **Tech stack**: Python 3.12 / FastAPI / Jinja2 / HTMX 2.x / SQLModel + Alembic / psycopg 3 / pdfplumber / Anthropic SDK / Resend / `itsdangerous`. Package manager: **uv**.
+- **Architecture reference**: [docs/TECHNICAL-ARCHITECTURE.md](../../docs/TECHNICAL-ARCHITECTURE.md) — five ADRs you should know cold (Anthropic Haiku for comprehension Qs, magic-link auth, pdfplumber over PyMuPDF, Cloud Logging, HTMX-no-SPA).
+- **Quality standards**:
+  - **WCAG conformance is a defining product requirement.** An accessibility regression on the reading surface is a **blocking** finding, not a suggestion.
+  - **Test coverage ≥80%** on `app/`. Untested new code is a blocking finding.
+  - **<100 ms perceived latency** for in-page view changes (preference toggles, fragment swaps). Flag any change that adds a synchronous network call to that path.
+  - **Privacy**: passages may be sensitive (sacred text, personal uploads). Cross-user reads = blocking. New surfaces that send passage text to third parties (other than Anthropic for question generation) require explicit ADR.
 
 Your reviews must ensure that code is:
 - Technically correct and follows best practices
@@ -146,20 +147,39 @@ Conduct thorough technical reviews of PRs linked to issues in the 'In Review' co
 
 Ensure changes align with standards in `CLAUDE.md`.
 
-<!--
-TEMPLATE: Fill in project-specific architecture compliance checks here.
+**Stack compliance (blocking if violated):**
+- New runtime dependencies added via `uv add` (not edited into `pyproject.toml` by hand). `uv.lock` must be committed alongside any dep change.
+- No new Node/JS build step. HTMX stays CDN-loaded. Pico.css stays CDN-loaded. The CI `node` job must remain auto-skipped.
+- No `pymupdf` / `fitz` imports — use `pdfplumber`. (ADR-003: PyMuPDF is AGPL, conflicts with BSL release path.)
+- No SPA framework imports (`react`, `vue`, `svelte`, `htmx-component-libraries`). HTMX-only client per ADR-005.
+- No password fields, password hashes, or `passlib` imports. Auth is passwordless magic link (ADR-002). A change introducing passwords requires a superseding ADR.
+- LLM calls go through the wrapper service, not directly to `anthropic.Anthropic`. The wrapper enforces the cache lookup, the input-token cap, and prompt caching.
 
-Example sections:
-**Technology Stack Compliance:**
-- [Language/framework version requirements]
-- [Build configuration]
-- [Testing patterns]
+**Code organization:**
+- App code in `app/` only. Tests in `tests/` only. Migrations in `alembic/versions/`.
+- One module per SQLModel entity: `app/models/<entity>.py` (singular). No god-modules.
+- Routes grouped by resource: `app/api/<resource>.py`. HTMX fragment templates under `templates/fragments/`; full pages under `templates/pages/`.
+- Shared services (LLM wrapper, email sender, PDF parser) live under `app/services/`.
 
-**Code Organization:**
-- [Directory structure]
-- [Module organization]
-- [Test file location]
--->
+**Migration discipline:**
+- Every schema change ships with an Alembic migration in the same PR.
+- Migration message describes the *why*, not the *what*. The SQL is in the file.
+- Migrations must be reversible (`downgrade()` defined and tested) unless the change is genuinely irreversible (data loss). Justify in the PR description if so.
+- A migration that touches existing rows must be safe under concurrent writes (no long table locks during business hours). Flag any `ALTER TABLE ... NOT NULL` without a backfill strategy.
+
+**Reading-surface specific checks:**
+- Preferences are applied via CSS variables in a server-rendered `<style id="reading-surface-style">` block. New transformations should follow the same pattern unless they fundamentally require DOM rewrites (e.g., bionic emphasis).
+- Server-side text transformations (e.g., bionic emphasis) must be opt-in per user and gated on a preference flag.
+- HTMX endpoints must return fragments, not full pages, when `HX-Request: true`. Assert `<html` is absent from the test response body.
+
+**Security checks:**
+- Secrets via `pydantic-settings` from env, never literals in code. New secret = new entry in `.claude/PROJECT.md` + Secret Manager.
+- `/login` and `/auth/verify` rate-limited per IP and per email. Any new unauthenticated POST endpoint needs the same.
+- New routes that read DB rows must filter by `current_user.id` unless explicitly public.
+
+**Performance checks:**
+- Any new synchronous external HTTP call on a render path is a flag — would it push the route over 100 ms?
+- N+1 queries on the reading surface are blocking (the surface is the perceived-latency hot spot).
 
 ### 3. Approval Decision Criteria
 

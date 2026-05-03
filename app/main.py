@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api import health, todos
+from app.api import auth, health, todos
 
 app = FastAPI(title="Agile Flow GCP")
 
@@ -23,3 +23,4 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # Routes
 app.include_router(health.router)
 app.include_router(todos.router)
+app.include_router(auth.router)

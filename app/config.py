@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     app_url: str = "http://localhost:8080"
     environment: str = "development"
 
+    # Magic-link sign-in (ADR-002). RESEND_API_KEY is required in any
+    # environment where /login is exercised; the Settings validator below
+    # gates non-dev environments. The base URL and from-email default to
+    # values safe for local dev so the test suite needs no env setup.
+    resend_api_key: str = ""
+    magic_link_base_url: str = "http://localhost:8080"
+    magic_link_from_email: str = "onboarding@resend.dev"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

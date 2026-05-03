@@ -61,8 +61,7 @@ def test_upgrade_creates_user_and_token_tables(alembic_cfg: Config) -> None:
 
     token_fks = inspector.get_foreign_keys("magic_link_token")
     assert any(
-        fk["referred_table"] == "user" and fk["referred_columns"] == ["id"]
-        for fk in token_fks
+        fk["referred_table"] == "user" and fk["referred_columns"] == ["id"] for fk in token_fks
     )
 
 

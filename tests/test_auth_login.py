@@ -35,12 +35,14 @@ def stub_email_sender(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     sent: list[dict] = []
 
     def fake_send(*, email: str, link: str, from_email: str, api_key: str) -> None:
-        sent.append({
-            "email": email,
-            "link": link,
-            "from_email": from_email,
-            "api_key": api_key,
-        })
+        sent.append(
+            {
+                "email": email,
+                "link": link,
+                "from_email": from_email,
+                "api_key": api_key,
+            }
+        )
 
     monkeypatch.setattr(magic_link, "send_magic_link_email", fake_send)
     return sent

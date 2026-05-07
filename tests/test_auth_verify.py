@@ -230,15 +230,28 @@ def test_verify_garbage_value_returns_none() -> None:
     assert verify_session(value="not-a-real-cookie", secret="s", max_age_seconds=3600) is None
 
 
+# A fixed reference UUID so each parametrized run compares the SAME pair
+# of values: a known reference vs. the parametrized "other." Without this,
+# a randomly-chosen comparison UUID would mean the parametrize was
+# decorative — the assertion would pass for the wrong structural reason.
+_REFERENCE_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")
+
+
 @pytest.mark.parametrize(
-    "user_id",
+    "other_user_id",
     [
         uuid.UUID("00000000-0000-0000-0000-000000000001"),
         uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
     ],
 )
-def test_sign_session_produces_distinct_cookies_per_user(user_id: uuid.UUID) -> None:
-    """Sanity: different user_ids must produce different cookie values."""
-    a = sign_session(user_id=uuid.uuid4(), secret="s")
-    b = sign_session(user_id=user_id, secret="s")
-    assert a != b
+def test_sign_session_produces_distinct_cookies_per_user(other_user_id: uuid.UUID) -> None:
+    """Two different user_ids must produce different cookie values.
+
+    The parametrize varies the "other" user_id while a fixed reference
+    user_id stays constant — so the property under test ("different inputs
+    yield different outputs") is what's actually exercised, not just
+    "two random sign_session calls produce different bytes."
+    """
+    reference = sign_session(user_id=_REFERENCE_USER_ID, secret="s")
+    other = sign_session(user_id=other_user_id, secret="s")
+    assert reference != other

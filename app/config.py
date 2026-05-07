@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     magic_link_base_url: str = "http://localhost:8080"
     magic_link_from_email: str = "onboarding@resend.dev"
 
+    # Session cookie signing (AUTH-2). 32+ random bytes, set per environment
+    # via Secret Manager. The dev default is the literal string "dev-only"
+    # so tests can run with no env setup; the validator below refuses this
+    # default in non-dev environments.
+    session_secret: str = "dev-only"
+    session_ttl_days: int = 30
+    session_cookie_secure: bool = True
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -68,6 +76,14 @@ class Settings(BaseSettings):
                 "DATABASE_URL env var didn't override the dev default — for "
                 "previews, NEON_API_KEY may be unconfigured so the Neon branch "
                 "step was skipped."
+            )
+        if self.session_secret in ("", "dev-only"):
+            raise ValueError(
+                f"SESSION_SECRET is the dev default or empty in {self.environment}. "
+                "Generate 32+ random bytes (e.g. `python -c 'import secrets; "
+                "print(secrets.token_urlsafe(32))'`) and set as a Cloud Run env "
+                "var (production reads from the SESSION_SECRET secret in Secret "
+                "Manager). Without this, every session cookie is forgeable."
             )
         return self
 

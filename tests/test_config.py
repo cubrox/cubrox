@@ -94,6 +94,7 @@ def test_production_postgres_url_passes(monkeypatch: pytest.MonkeyPatch) -> None
     # non-empty URL and returns clean.
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@h.neon.tech/db")
+    monkeypatch.setenv("SESSION_SECRET", "test-only-not-the-real-secret")
     from app.config import Settings
 
     settings = Settings()
@@ -120,6 +121,7 @@ def test_preview_postgres_url_passes(monkeypatch: pytest.MonkeyPatch) -> None:
     # happy path while widening the gate.
     monkeypatch.setenv("ENVIRONMENT", "preview")
     monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@h.neon.tech/preview-pr-1")
+    monkeypatch.setenv("SESSION_SECRET", "test-only-not-the-real-secret")
     from app.config import Settings
 
     settings = Settings()

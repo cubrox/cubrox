@@ -5,7 +5,7 @@
 {% block content %}
   {% include "fragments/reader_style.html" %}
 
-  <article id="reading-surface">{{ passage.text }}</article>
+  <article id="reading-surface">{% if prefs.bionic_enabled %}{{ passage.text | bionic }}{% else %}{{ passage.text }}{% endif %}</article>
 
   <aside class="reader-controls" aria-label="Reading preferences">
     <details>

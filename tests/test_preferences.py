@@ -308,3 +308,51 @@ def test_sidebar_uses_button_not_div_for_controls(client: TestClient, session: S
     # We use 'type="button"' to prevent any wrapping form from
     # treating the button as a submit. Pin this attribute.
     assert 'type="button"' in body
+
+
+# ---------------------------------------------------------------------------
+# Template-route contract — values rendered must match values accepted
+# ---------------------------------------------------------------------------
+
+
+def test_bionic_buttons_render_lowercase_booleans_and_route_accepts_them(
+    client: TestClient, session: Session
+) -> None:
+    """The original READ-2 review caught: Jinja's `{{ opt | string }}` on
+    a Python bool produces 'True'/'False' (capitalized), but the route's
+    coerce_value() only accepts lowercase 'true'/'false'. The bug was
+    invisible to unit tests that posted lowercase strings directly.
+
+    This test pins the contract by checking BOTH (a) the rendered HTML
+    contains the lowercase form, AND (b) posting that exact rendered
+    value succeeds at the route. A future template refactor that drifts
+    back to `| string` fails (a); a future route change that requires
+    capitalized booleans fails (b).
+    """
+    user = _signed_in(client, session)
+    passage = _make_passage(session, user.id)
+
+    response = client.get(f"/read/{passage.id}")
+    body = response.text
+
+    # (a) The bionic buttons render the LOWERCASE form, not capitalized.
+    assert '"value": "true"' in body
+    assert '"value": "false"' in body
+    assert '"value": "True"' not in body
+    assert '"value": "False"' not in body
+
+    # (b) Posting either of those values succeeds (round-trip).
+    on = client.post("/preferences/bionic_enabled", data={"value": "true"})
+    off = client.post("/preferences/bionic_enabled", data={"value": "false"})
+    assert on.status_code == 200
+    assert off.status_code == 200
+
+
+def test_value_for_form_helper_handles_booleans_and_strings() -> None:
+    """Unit test on the template helper itself, separate from the route."""
+    from app.services.reading.options import value_for_form
+
+    assert value_for_form(True) == "true"
+    assert value_for_form(False) == "false"
+    assert value_for_form("18px") == "18px"
+    assert value_for_form("#ffffff") == "#ffffff"

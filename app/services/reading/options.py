@@ -75,3 +75,19 @@ def label_for(key: str, value: Any) -> str:
     sidebar template to render button text.
     """
     return PREFERENCE_LABELS.get((key, value), str(value))
+
+
+def value_for_form(value: Any) -> str:
+    """Render a preference value as the string the route expects to receive.
+
+    The route's `coerce_value()` accepts lowercase 'true'/'false' for the
+    bionic_enabled boolean. Python's str(True) is 'True' (capitalized),
+    so a naive template render of `{{ opt | string }}` would emit a value
+    the route then rejects with 422. This helper produces the lowercase
+    form for booleans and str(value) for everything else.
+    """
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    return str(value)

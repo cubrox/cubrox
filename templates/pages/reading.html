@@ -18,7 +18,7 @@
             <button
               type="button"
               hx-post="/preferences/{{ key }}"
-              hx-vals='{"value": "{{ opt | string }}"}'
+              hx-vals='{"value": "{{ value_for_form(opt) }}"}'
               hx-target="#reading-surface-style"
               hx-swap="outerHTML"
               aria-pressed="{{ 'true' if prefs[key] == opt else 'false' }}"

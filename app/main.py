@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from app.api import auth, health, todos
+from app.api import auth, health, passages, todos
 from app.services.identity.session import UnauthenticatedError
 
 app = FastAPI(title="Agile Flow GCP")
@@ -42,3 +42,4 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.include_router(health.router)
 app.include_router(todos.router)
 app.include_router(auth.router)
+app.include_router(passages.router)

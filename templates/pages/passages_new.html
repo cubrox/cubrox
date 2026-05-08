@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Paste a passage — Cubrox{% endblock %}
+
+{% block content %}
+  <hgroup>
+    <h1>Paste a passage</h1>
+    <p>Paste or type the text you want to read. Your reading preferences will
+       be applied when it renders.</p>
+  </hgroup>
+
+  <form action="/passages" method="post">
+    <label for="text">
+      Text
+      <textarea
+        id="text"
+        name="text"
+        rows="14"
+        required
+        autofocus
+        placeholder="Paste or type your passage here..."
+        aria-describedby="text-help"></textarea>
+      <small id="text-help">Up to 100,000 characters (~4,000 lines).</small>
+    </label>
+
+    <button type="submit">Save and read</button>
+  </form>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Reading — Cubrox{% endblock %}
+
+{% block content %}
+  <style id="reading-surface-style">
+    :root {
+      --reader-font: {{ prefs.font | safe }};
+      --reader-size: {{ prefs.size | safe }};
+      --reader-line-height: {{ prefs.line_height | safe }};
+      --reader-bg: {{ prefs.bg | safe }};
+      --reader-fg: {{ prefs.fg | safe }};
+      --reader-max-width: {{ prefs.max_width | safe }};
+    }
+  </style>
+
+  <article id="reading-surface">{{ passage.text }}</article>
+{% endblock %}

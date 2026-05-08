@@ -1,6 +1,27 @@
 /* Workshop-specific overrides on top of Pico.css defaults.
    Keep this small — Pico.css handles 95% of the styling. */
 
+/* Reading surface — driven by per-user CSS variables set in the
+   <style id="reading-surface-style"> block emitted by templates/pages/
+   reading.html. The variables are populated server-side from the user's
+   stored Preference row (or defaults from app/services/reading/
+   defaults.py when no row exists yet). First paint already correct. */
+#reading-surface {
+  font-family: var(--reader-font);
+  font-size: var(--reader-size);
+  line-height: var(--reader-line-height);
+  background: var(--reader-bg);
+  color: var(--reader-fg);
+  max-width: var(--reader-max-width);
+  margin: 2rem auto;
+  padding: 2rem;
+  /* Preserve the user's pasted whitespace structure (line breaks,
+     paragraph breaks). Without this, all text flows as one block. */
+  white-space: pre-wrap;
+  /* Long words and URLs shouldn't blow out the max-width. */
+  overflow-wrap: break-word;
+}
+
 .todo-list {
   list-style: none;
   padding: 0;

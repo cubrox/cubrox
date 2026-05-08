@@ -25,9 +25,11 @@ from sqlmodel import Session
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.models.magic_link_token import MagicLinkToken
+from app.models.user import User
 from app.services.identity import magic_link
 from app.services.identity.session import (
     SESSION_COOKIE_NAME,
+    current_user,
     sign_session,
 )
 
@@ -35,6 +37,7 @@ router = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+CurrentUser = Annotated[User, Depends(current_user)]
 
 GENERIC_FRAGMENT = "<p>Check your inbox for a sign-in link.</p>"
 
@@ -122,3 +125,14 @@ def verify(
         samesite="lax",
     )
     return response
+
+
+@router.get("/api/me")
+def me(user: CurrentUser) -> dict[str, str]:
+    """Return the signed-in user's id + email.
+
+    The simplest possible auth-required endpoint. Useful for client-side
+    "are we signed in?" checks and as the canonical test target for the
+    `current_user` dependency.
+    """
+    return {"id": str(user.id), "email": user.email}

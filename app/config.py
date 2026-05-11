@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     magic_link_base_url: str = "http://localhost:8080"
     magic_link_from_email: str = "onboarding@resend.dev"
 
+    # Anthropic LLM (ADR-001). Used by app/services/comprehension/generator.py
+    # to generate reading-comprehension questions. The route layer that
+    # consumes this builds the client lazily so missing config doesn't
+    # fail the app boot — just the /questions feature degrades.
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-haiku-4-5"
+
     # Session cookie signing (AUTH-2). 32+ random bytes, set per environment
     # via Secret Manager. The dev default is the literal string "dev-only"
     # so tests can run with no env setup; the validator below refuses this

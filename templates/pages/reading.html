@@ -7,6 +7,12 @@
 
   <article id="reading-surface">{% if prefs.bionic_enabled %}{{ passage.text | bionic }}{% else %}{{ passage.text }}{% endif %}</article>
 
+  <div id="questions-panel"
+       hx-get="/passages/{{ passage.id }}/questions"
+       hx-trigger="load delay:200ms"
+       hx-swap="outerHTML"
+       aria-live="polite"></div>
+
   <aside class="reader-controls" aria-label="Reading preferences">
     <details>
       <summary>Reading preferences</summary>

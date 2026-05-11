@@ -1,30 +1,40 @@
-"""Reading-view + preference-toggle routes.
+"""Reading-view + preference-toggle + comprehension-question routes.
 
-GET  /read/{passage_id}     — render the configurable reading surface
-POST /preferences/{key}     — set one preference, return the swappable
-                              <style> fragment for HTMX outerHTML
+GET  /read/{passage_id}             — render the configurable reading surface
+POST /preferences/{key}             — set one preference, return the
+                                       swappable <style> fragment
+GET  /passages/{passage_id}/questions — HTMX-lazy-loaded comprehension
+                                        question fragment
 
 Owner check on the GET: a user can only view their own passages. Other
 users' passages return 404 (not 403) — same response shape as a
 nonexistent UUID, so the existence of any specific passage isn't leaked.
 
 Per ADR-005 (HTMX, no SPA), all reading-state lives in the URL + cookie
-+ DB; no client-side state container. The POST returns ONLY the
-`<style id="reading-surface-style">` fragment so HTMX can swap it
-in place without touching anything else on the page.
++ DB; no client-side state container. The preference POST and questions
+GET return ONLY fragments so HTMX can swap them in place without
+touching anything else on the page.
 """
 
+import logging
 import uuid
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
 
+from app.config import Settings, get_settings
 from app.db import get_session
 from app.models.passage import Passage
 from app.models.preference import Preference
 from app.models.user import User
+from app.services.comprehension.client import get_anthropic_client
+from app.services.comprehension.generator import (
+    GeneratorError,
+    PassageTooLongError,
+    generate_questions,
+)
 from app.services.identity.session import current_user
 from app.services.reading.defaults import with_defaults
 from app.services.reading.options import (
@@ -36,10 +46,17 @@ from app.services.reading.options import (
 from app.services.reading.preferences import upsert_preference
 from app.templates import templates
 
+if TYPE_CHECKING:
+    import anthropic
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
+SettingsDep = Annotated[Settings, Depends(get_settings)]
 CurrentUser = Annotated[User, Depends(current_user)]
+AnthropicClientDep = Annotated["anthropic.Anthropic", Depends(get_anthropic_client)]
 
 
 @router.get("/read/{passage_id}", response_class=HTMLResponse)
@@ -122,4 +139,67 @@ def update_preference(
         request=request,
         name="fragments/reader_style.html",
         context={"prefs": prefs},
+    )
+
+
+@router.get("/passages/{passage_id}/questions", response_class=HTMLResponse)
+def passage_questions(
+    request: Request,
+    passage_id: uuid.UUID,
+    user: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+    anthropic_client: AnthropicClientDep,
+) -> HTMLResponse:
+    """Return the comprehension-question fragment for one passage.
+
+    HTMX-lazy-loaded from the reading view: the `<div id="questions-
+    panel" hx-trigger="load delay:200ms">` placeholder fires this
+    route ~200ms after the page first paints, so the reading surface
+    feels instant even when a cache-miss + LLM call adds latency.
+
+    Three response shapes (all 200, all HTML fragments):
+      - Success → questions list inside <section aria-label="...">
+      - PassageTooLongError → friendly "split it" message
+      - GeneratorError → "temporarily unavailable" message (logged WARN)
+
+    Owner check mirrors GET /read: cross-user passage and nonexistent
+    passage both return 404 with identical body to avoid leaking
+    existence.
+    """
+    passage = session.exec(
+        select(Passage).where(Passage.id == passage_id, Passage.user_id == user.id)  # type: ignore[arg-type]
+    ).first()
+    if passage is None:
+        raise HTTPException(status_code=404, detail="Passage not found")
+
+    questions: list[dict] | None = None
+    error: str | None = None
+
+    try:
+        questions = generate_questions(
+            passage_text=passage.text,
+            question_type="recall",
+            client=anthropic_client,
+            model_id=settings.anthropic_model,
+            session=session,
+        )
+    except PassageTooLongError:
+        # User-recoverable: tell them to split. NOT logged at WARN
+        # because it's expected behaviour on long passages.
+        error = "too_long"
+    except GeneratorError:
+        # System-side: log so we can investigate, surface a friendly
+        # message to the user. NEVER 500 because comprehension is a
+        # feature, not a hard dependency.
+        logger.warning(
+            "comprehension generator failed",
+            extra={"passage_id": str(passage_id), "user_id": str(user.id)},
+        )
+        error = "unavailable"
+
+    return templates.TemplateResponse(
+        request=request,
+        name="fragments/questions_panel.html",
+        context={"questions": questions, "error": error},
     )

@@ -1,0 +1,16 @@
+<section aria-label="Comprehension check" id="questions-panel">
+  {% if questions %}
+    <h2>Check your understanding</h2>
+    <ol>
+      {% for q in questions %}
+        <li>{{ q.text }}</li>
+      {% endfor %}
+    </ol>
+  {% elif error == "too_long" %}
+    <p>This passage is too long for comprehension questions right now.
+       Try splitting it into shorter sections.</p>
+  {% elif error == "unavailable" %}
+    <p>Comprehension questions are temporarily unavailable.
+       The rest of your reading still works as normal.</p>
+  {% endif %}
+</section>

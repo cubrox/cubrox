@@ -1,40 +1,38 @@
 {% extends "base.html" %}
 
-{% block title %}Todo — Agile Flow GCP{% endblock %}
+{% block title %}Cubrox — A calmer way to read{% endblock %}
 
 {% block content %}
   <hgroup>
-    <h1>Todo</h1>
-    <p>
-      Reference app for the Agile Flow GCP workshop. Delete this and build
-      your own product. The HTMX patterns below show how to swap server-
-      rendered fragments into the DOM without writing any JavaScript.
-    </p>
+    <h1>Cubrox</h1>
+    <p>A reading experience tuned for neurodivergent readers — and anyone
+       else who finds long-form text hard to stay with.</p>
   </hgroup>
 
   <section>
-    <form hx-post="/todos"
-          hx-target="#todo-list"
-          hx-swap="outerHTML"
-          hx-on::after-request="this.reset()">
-      <fieldset role="group">
-        <input type="text"
-               name="title"
-               placeholder="What needs doing?"
-               required
-               autofocus>
-        <button type="submit">Add</button>
-      </fieldset>
-    </form>
-
-    {% include "_fragments/todo_list.html" %}
+    <p>Paste any passage. Cubrox renders it in a calm, configurable
+       reading surface with your choice of font, size, contrast, line
+       spacing, and column width — and offers a quick comprehension
+       check at the end so you know what you absorbed.</p>
   </section>
 
-  <footer>
-    <small>
-      Built with FastAPI + Jinja2 + HTMX on GCP Cloud Run + Neon.
-      See <code>docs/PATTERN-LIBRARY.md</code> for the patterns powering
-      this stack.
-    </small>
-  </footer>
+  <form id="signin-form"
+        hx-post="/login"
+        hx-target="#signin-form"
+        hx-swap="outerHTML">
+    <label for="email">
+      Email
+      <input
+        type="email"
+        id="email"
+        name="email"
+        required
+        autofocus
+        placeholder="you@example.com"
+        autocomplete="email">
+      <small>We'll email you a one-time sign-in link. No password to remember.</small>
+    </label>
+
+    <button type="submit">Send me a sign-in link</button>
+  </form>
 {% endblock %}

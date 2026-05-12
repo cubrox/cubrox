@@ -10,13 +10,6 @@ from sqlmodel import Session, select
 from app.models.todo import Todo
 
 
-def test_home_renders_empty_state(client: TestClient) -> None:
-    response = client.get("/")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    assert "No todos yet" in response.text
-
-
 def test_create_todo_returns_updated_list_fragment(
     client: TestClient,
     session: Session,

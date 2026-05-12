@@ -25,17 +25,6 @@ router = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 
 
-@router.get("/", response_class=HTMLResponse)
-async def home(request: Request, session: SessionDep) -> HTMLResponse:
-    """Render the home page with the full todo list."""
-    todos = session.exec(select(Todo).order_by(desc("created_at"))).all()
-    return templates.TemplateResponse(
-        request,
-        "home.html",
-        {"todos": todos},
-    )
-
-
 @router.post("/todos", response_class=HTMLResponse)
 async def create_todo(
     request: Request,

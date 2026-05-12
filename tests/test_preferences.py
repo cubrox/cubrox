@@ -191,10 +191,10 @@ def test_bionic_enabled_rejects_non_boolean_strings(client: TestClient, session:
 # ---------------------------------------------------------------------------
 
 
-def test_unauthenticated_post_redirects_to_login(client: TestClient) -> None:
+def test_unauthenticated_post_redirects_to_landing(client: TestClient) -> None:
     response = client.post("/preferences/size", data={"value": "20px"}, follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/login"
+    assert response.headers["location"] == "/"
 
 
 # ---------------------------------------------------------------------------

@@ -121,16 +121,16 @@ def test_text_over_limit_returns_422(client: TestClient, session: Session) -> No
 # ---------------------------------------------------------------------------
 
 
-def test_unauthenticated_post_redirects_to_login(client: TestClient) -> None:
+def test_unauthenticated_post_redirects_to_landing(client: TestClient) -> None:
     response = client.post("/passages", data={"text": "anything"}, follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/login"
+    assert response.headers["location"] == "/"
 
 
-def test_unauthenticated_get_form_redirects_to_login(client: TestClient) -> None:
+def test_unauthenticated_get_form_redirects_to_landing(client: TestClient) -> None:
     response = client.get("/passages/new", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/login"
+    assert response.headers["location"] == "/"
 
 
 # ---------------------------------------------------------------------------

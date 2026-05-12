@@ -75,16 +75,16 @@ def test_valid_cookie_returns_user_info(client: TestClient, session: Session) ->
 # ---------------------------------------------------------------------------
 
 
-def test_missing_cookie_browser_request_redirects_to_login(client: TestClient) -> None:
+def test_missing_cookie_browser_request_redirects_to_landing(client: TestClient) -> None:
     response = client.get("/api/me", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/login"
+    assert response.headers["location"] == "/"
 
 
 def test_missing_cookie_htmx_request_returns_hx_redirect(client: TestClient) -> None:
     response = client.get("/api/me", headers={"HX-Request": "true"}, follow_redirects=False)
     assert response.status_code == 200
-    assert response.headers.get("hx-redirect") == "/login"
+    assert response.headers.get("hx-redirect") == "/"
 
 
 def test_tampered_cookie_browser_request_redirects(client: TestClient, session: Session) -> None:
@@ -95,7 +95,7 @@ def test_tampered_cookie_browser_request_redirects(client: TestClient, session: 
     response = client.get("/api/me", follow_redirects=False)
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/login"
+    assert response.headers["location"] == "/"
 
 
 def test_tampered_cookie_htmx_returns_hx_redirect(client: TestClient, session: Session) -> None:
@@ -106,7 +106,7 @@ def test_tampered_cookie_htmx_returns_hx_redirect(client: TestClient, session: S
     response = client.get("/api/me", headers={"HX-Request": "true"}, follow_redirects=False)
 
     assert response.status_code == 200
-    assert response.headers.get("hx-redirect") == "/login"
+    assert response.headers.get("hx-redirect") == "/"
 
 
 def test_cookie_for_deleted_user_redirects(client: TestClient, session: Session) -> None:
@@ -121,7 +121,7 @@ def test_cookie_for_deleted_user_redirects(client: TestClient, session: Session)
     response = client.get("/api/me", follow_redirects=False)
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/login"
+    assert response.headers["location"] == "/"
 
 
 def test_cookie_with_signed_secret_mismatch_redirects(client: TestClient) -> None:

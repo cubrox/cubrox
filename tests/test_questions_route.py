@@ -305,24 +305,24 @@ def test_generator_error_log_does_not_include_passage_text(
 # ---------------------------------------------------------------------------
 
 
-def test_unauthenticated_returns_303_to_login(client: TestClient) -> None:
+def test_unauthenticated_returns_303_to_landing(client: TestClient) -> None:
     response = client.get(f"/passages/{uuid.uuid4()}/questions", follow_redirects=False)
     # Without HX-Request header: browser navigation → 303 redirect.
     assert response.status_code == 303
-    assert response.headers["location"] == "/login"
+    assert response.headers["location"] == "/"
 
 
 def test_unauthenticated_htmx_request_gets_hx_redirect(client: TestClient) -> None:
     """An HTMX request without a session cookie gets the HX-Redirect
     treatment from AUTH-3's exception handler. Without this, HTMX
-    would silently fail to navigate the user to /login."""
+    would silently fail to navigate the user to the landing page."""
     response = client.get(
         f"/passages/{uuid.uuid4()}/questions",
         headers={"HX-Request": "true"},
         follow_redirects=False,
     )
     assert response.status_code == 200
-    assert response.headers.get("HX-Redirect") == "/login"
+    assert response.headers.get("HX-Redirect") == "/"
 
 
 # ---------------------------------------------------------------------------

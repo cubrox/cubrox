@@ -235,10 +235,10 @@ def test_other_user_and_nonexistent_have_identical_response_shape(
 # ---------------------------------------------------------------------------
 
 
-def test_unauthenticated_returns_303_to_login(client: TestClient) -> None:
+def test_unauthenticated_returns_303_to_landing(client: TestClient) -> None:
     response = client.get(f"/read/{uuid.uuid4()}", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/login"
+    assert response.headers["location"] == "/"
 
 
 def test_invalid_uuid_returns_422(client: TestClient, session: Session) -> None:

@@ -1,28 +1,51 @@
 {% extends "base.html" %}
 
-{% block title %}Paste a passage — Cubrox{% endblock %}
+{% block title %}Add a passage — Cubrox{% endblock %}
 
 {% block content %}
   <hgroup>
-    <h1>Paste a passage</h1>
-    <p>Paste or type the text you want to read. Your reading preferences will
-       be applied when it renders.</p>
+    <h1>Add a passage</h1>
+    <p>Paste text directly, or upload a PDF. Either way your reading
+       preferences will be applied when it renders.</p>
   </hgroup>
 
-  <form action="/passages" method="post">
-    <label for="text">
-      Text
-      <textarea
-        id="text"
-        name="text"
-        rows="14"
-        required
-        autofocus
-        placeholder="Paste or type your passage here..."
-        aria-describedby="text-help"></textarea>
-      <small id="text-help">Up to 100,000 characters (~4,000 lines).</small>
-    </label>
+  <article>
+    <header><strong>Paste text</strong></header>
+    <form action="/passages" method="post">
+      <label for="text">
+        Text
+        <textarea
+          id="text"
+          name="text"
+          rows="10"
+          required
+          autofocus
+          placeholder="Paste or type your passage here..."
+          aria-describedby="text-help"></textarea>
+        <small id="text-help">Up to 100,000 characters (~4,000 lines).</small>
+      </label>
+      <button type="submit">Save and read</button>
+    </form>
+  </article>
 
-    <button type="submit">Save and read</button>
-  </form>
+  <article>
+    <header><strong>Upload a PDF</strong></header>
+    <form action="/passages/pdf" method="post" enctype="multipart/form-data">
+      <label for="pdf-file">
+        PDF file
+        <input
+          type="file"
+          id="pdf-file"
+          name="file"
+          accept="application/pdf"
+          required
+          aria-describedby="pdf-help">
+        <small id="pdf-help">
+          Up to 25 MB. The text is extracted server-side; only the extracted
+          text is stored. Scanned PDFs without OCR won't produce readable text.
+        </small>
+      </label>
+      <button type="submit">Upload and read</button>
+    </form>
+  </article>
 {% endblock %}

@@ -1,22 +1,23 @@
 """Passage ingestion routes.
 
-Two endpoints for the paste-text path:
-  GET  /passages/new — render the paste form (auth-required)
-  POST /passages     — persist the pasted text, redirect to /read/{id}
+Three endpoints across paste-text + PDF-upload paths:
+  GET  /passages/new  — render the upload page (auth-required)
+  POST /passages      — persist pasted text, redirect to /read/{id}
+  POST /passages/pdf  — parse uploaded PDF in-process, persist text,
+                        redirect to /read/{id}
 
-Both require an authenticated user; unauthenticated requests get the
-standard /login redirect via the `current_user` dependency. Per ADR
-guardrails, this route writes the text byte-for-byte (no normalization)
-so the SHA-256 hash matches what the comprehension cache will look up.
-
-PDF ingestion is a separate route in INGEST-2 (#14); it lives here too
-when shipped.
+All require an authenticated user; unauthenticated requests get the
+standard landing-page redirect via the `current_user` dependency. Per
+ADR guardrails, the paste route writes text byte-for-byte (no
+normalization) so the SHA-256 hash matches what the comprehension cache
+will look up. The PDF route hashes the *extracted* text, not the PDF
+bytes — the cache is keyed on what the user reads, not how it arrived.
 """
 
 import hashlib
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session
 
@@ -24,6 +25,7 @@ from app.db import get_session
 from app.models.passage import Passage
 from app.models.user import User
 from app.services.identity.session import current_user
+from app.services.ingestion.pdf import EmptyPdfTextError, PdfParseError, extract_text
 from app.templates import templates
 
 router = APIRouter()
@@ -35,6 +37,15 @@ CurrentUser = Annotated[User, Depends(current_user)]
 # regular prose — enough for a chapter-length excerpt, far enough below
 # Cloud Run's 32 MB request body limit to stay safe.
 MAX_TEXT_LEN = 100_000
+
+# Cloud Run caps inbound request bodies at 32 MB. 25 MB leaves headroom
+# for multipart framing overhead and keeps memory use bounded since we
+# parse PDFs in-process per ADR-003.
+MAX_PDF_BYTES = 25 * 1024 * 1024
+
+EMPTY_PDF_MESSAGE = (
+    "This PDF didn't produce any extractable text. Try copy-pasting the text directly."
+)
 
 
 @router.get("/passages/new", response_class=HTMLResponse)
@@ -83,4 +94,64 @@ def create_passage(
 
     # /read/{id} ships in READ-1 (#15). Until then this redirect lands
     # on a 404 — the URL shape is what matters for downstream wiring.
+    return RedirectResponse(url=f"/read/{passage.id}", status_code=303)
+
+
+@router.post("/passages/pdf")
+async def create_passage_from_pdf(
+    request: Request,
+    user: CurrentUser,
+    session: SessionDep,
+    file: Annotated[UploadFile, File()],
+) -> RedirectResponse:
+    """Parse an uploaded PDF in-process and persist its extracted text.
+
+    Validation order (cheapest checks first, so we reject before reading
+    the file into memory):
+      1. Content-Length header ≤ 25 MB (avoids loading huge bodies)
+      2. content_type == 'application/pdf' (no .txt or .docx)
+      3. Actual byte length ≤ 25 MB (header can lie)
+      4. pdfplumber successfully opens the file (else 422 with helpful text)
+      5. Extracted text is non-empty after stripping (else 422 same message)
+    """
+    content_length = request.headers.get("content-length")
+    if content_length is not None and int(content_length) > MAX_PDF_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"PDF exceeds {MAX_PDF_BYTES // (1024 * 1024)} MB limit",
+        )
+
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=415,
+            detail="Only PDF files are accepted (Content-Type: application/pdf)",
+        )
+
+    pdf_bytes = await file.read()
+    if len(pdf_bytes) > MAX_PDF_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"PDF exceeds {MAX_PDF_BYTES // (1024 * 1024)} MB limit",
+        )
+
+    try:
+        text = extract_text(pdf_bytes)
+    except (PdfParseError, EmptyPdfTextError):
+        raise HTTPException(status_code=422, detail=EMPTY_PDF_MESSAGE) from None
+
+    if len(text) > MAX_TEXT_LEN:
+        text = text[:MAX_TEXT_LEN]
+
+    text_hash = hashlib.sha256(text.encode("utf-8")).digest()
+    passage = Passage(
+        user_id=user.id,
+        text=text,
+        text_hash=text_hash,
+        source_type="pdf",
+        source_filename=file.filename,
+    )
+    session.add(passage)
+    session.commit()
+    session.refresh(passage)
+
     return RedirectResponse(url=f"/read/{passage.id}", status_code=303)

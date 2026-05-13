@@ -32,6 +32,10 @@ from app.services.identity.session import (
     current_user,
     sign_session,
 )
+from app.services.rate_limit import (
+    enforce_login_rate_limit,
+    enforce_verify_rate_limit,
+)
 
 router = APIRouter()
 
@@ -47,7 +51,12 @@ GENERIC_FRAGMENT = "<p>Check your inbox for a sign-in link.</p>"
 _TOKEN_TABLE = MagicLinkToken.metadata.tables["magic_link_token"]
 
 
-@router.post("/login", response_class=HTMLResponse, status_code=202)
+@router.post(
+    "/login",
+    response_class=HTMLResponse,
+    status_code=202,
+    dependencies=[Depends(enforce_login_rate_limit)],
+)
 def login(
     background_tasks: BackgroundTasks,
     session: SessionDep,
@@ -77,7 +86,7 @@ def login(
     return GENERIC_FRAGMENT
 
 
-@router.get("/auth/verify")
+@router.get("/auth/verify", dependencies=[Depends(enforce_verify_rate_limit)])
 def verify(
     token: str,
     session: SessionDep,

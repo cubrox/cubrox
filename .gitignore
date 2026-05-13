@@ -60,3 +60,9 @@ logs/
 # never commit. Use scripts/roster.example.csv as the format reference.
 roster.csv
 roster-output.csv
+
+# Accessibility test harness (A11Y-1). Node lives only under tests/a11y/;
+# node_modules/ is already covered by the framework rule above, but
+# Playwright's per-run artifacts get their own entries.
+tests/a11y/test-results/
+tests/a11y/playwright-report/

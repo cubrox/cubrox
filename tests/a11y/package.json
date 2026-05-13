@@ -1,0 +1,13 @@
+{
+  "name": "cubrox-a11y-tests",
+  "private": true,
+  "description": "Playwright + axe-core accessibility harness. Scoped to tests/a11y/ — production stays Node-free. See tests/a11y/README.md.",
+  "scripts": {
+    "test": "playwright test",
+    "install-browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.11.3",
+    "@playwright/test": "1.60.0"
+  }
+}

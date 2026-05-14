@@ -13,6 +13,44 @@
        hx-swap="outerHTML"
        aria-live="polite"></div>
 
+  {#
+    METRIC-2: emit one reading_event on unload. The inline <script>
+    measures the rendered <article>'s height in line-heights and stashes
+    the count on `window.cubroxLineCount`. The hidden <div> below uses
+    hx-trigger="unload from:body" so HTMX fires the POST when the user
+    leaves the page (close tab, navigate away, refresh). hx-vals 'js:'
+    pulls the count from the window at fire time, not at render time.
+    Failure modes are silent by design — the server returns 204 even on
+    out-of-range values; the unload path can't surface errors anyway.
+  #}
+  <script>
+    (function () {
+      var surface = document.getElementById("reading-surface");
+      if (!surface) {
+        window.cubroxLineCount = 1;
+        return;
+      }
+      // Use computed line-height so a user's preference change (toggled
+      // server-side after first paint) is reflected on the next close.
+      var cs = window.getComputedStyle(surface);
+      var lineHeight = parseFloat(cs.lineHeight);
+      if (!isFinite(lineHeight) || lineHeight <= 0) {
+        // Fallback: the browser returned "normal". Estimate from
+        // font-size * 1.2 (CSS default ratio).
+        lineHeight = parseFloat(cs.fontSize) * 1.2;
+      }
+      var lines = Math.max(1, Math.round(surface.scrollHeight / lineHeight));
+      window.cubroxLineCount = lines;
+    })();
+  </script>
+  <div id="reading-close-beacon"
+       hx-post="/passages/{{ passage.id }}/close"
+       hx-trigger="unload from:body"
+       hx-vals='js:{lines: window.cubroxLineCount}'
+       hx-swap="none"
+       aria-hidden="true"
+       style="display:none"></div>
+
   <aside class="reader-controls" aria-label="Reading preferences">
     <details>
       <summary>Reading preferences</summary>

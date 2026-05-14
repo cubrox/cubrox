@@ -5,6 +5,8 @@ POST /preferences/{key}             — set one preference, return the
                                        swappable <style> fragment
 GET  /passages/{passage_id}/questions — HTMX-lazy-loaded comprehension
                                         question fragment
+POST /passages/{passage_id}/close   — unload-time beacon recording one
+                                        reading_event row (METRIC-2)
 
 Owner check on the GET: a user can only view their own passages. Other
 users' passages return 404 (not 403) — same response shape as a
@@ -20,7 +22,7 @@ import logging
 import uuid
 from typing import TYPE_CHECKING, Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
 
@@ -28,6 +30,7 @@ from app.config import Settings, get_settings
 from app.db import get_session
 from app.models.passage import Passage
 from app.models.preference import Preference
+from app.models.reading_event import ReadingEvent
 from app.models.user import User
 from app.services.comprehension.client import get_anthropic_client
 from app.services.comprehension.generator import (
@@ -203,3 +206,67 @@ def passage_questions(
         name="fragments/questions_panel.html",
         context={"questions": questions, "error": error},
     )
+
+
+# Inclusive bounds for client-supplied line counts. 1 is the natural
+# floor (zero lines processed is meaningless noise). 100_000 mirrors
+# INGEST-1's text-length cap — any value above that means the client
+# is lying or the column count broke.
+_MIN_LINES = 1
+_MAX_LINES = 100_000
+
+
+@router.post("/passages/{passage_id}/close")
+def passage_close(
+    passage_id: uuid.UUID,
+    user: CurrentUser,
+    session: SessionDep,
+    lines: Annotated[int, Form()],
+) -> Response:
+    """Record one `reading_event` row when the user closes a passage.
+
+    Fired by HTMX `hx-trigger="unload from:body"` on the reading view's
+    hidden beacon div. Returns 204 No Content — the response body is
+    irrelevant because the browser is already tearing down the page.
+
+    Ownership check is identical to GET /read: a user closing someone
+    else's passage gets a 404 (same body as a nonexistent UUID) so
+    we don't leak which IDs exist.
+
+    Validation is permissive: out-of-range `lines` values get a 204
+    with NO row inserted (logged but otherwise silent). The unload
+    path can't surface errors anyway, so a noisy 4xx would be wasted —
+    better to drop the bad data and move on.
+
+    Idempotency: this route does NOT deduplicate. Browser quirks
+    (back/forward cache, refresh, bfcache restore) will occasionally
+    double-fire. The PRD metric tolerates a small over-count; revisit
+    only if dogfooding shows material divergence from manual counts.
+    """
+    passage = session.exec(
+        select(Passage).where(Passage.id == passage_id, Passage.user_id == user.id)  # type: ignore[arg-type]
+    ).first()
+    if passage is None:
+        # Same 404 as cross-user/nonexistent on GET /read; preserves the
+        # "existence isn't leaked" invariant.
+        raise HTTPException(status_code=404, detail="Passage not found")
+
+    if not (_MIN_LINES <= lines <= _MAX_LINES):
+        logger.warning(
+            "passage_close.invalid_lines user_id=%s passage_id=%s lines=%s",
+            user.id,
+            passage_id,
+            lines,
+        )
+        return Response(status_code=204)
+
+    session.add(
+        ReadingEvent(
+            user_id=user.id,
+            passage_id=passage_id,
+            lines_processed=lines,
+        )
+    )
+    session.commit()
+
+    return Response(status_code=204)

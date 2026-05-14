@@ -95,9 +95,7 @@ def test_seed_high_contrast_variant_writes_dark_bg_fg(
     assert prefs[0].values == {"bg": "#1a1a1a", "fg": "#e8e8e8"}
 
 
-def test_seed_large_text_variant_writes_28px(
-    seed_client: TestClient, session: Session
-) -> None:
+def test_seed_large_text_variant_writes_28px(seed_client: TestClient, session: Session) -> None:
     response = seed_client.post(
         "/test/seed-passage-and-login?variant=large-text", follow_redirects=False
     )

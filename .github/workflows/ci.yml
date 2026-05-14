@@ -204,3 +204,81 @@ jobs:
       - name: Build
         if: steps.check_node.outputs.skip != 'true'
         run: npm run build
+
+  a11y:
+    # Accessibility & WCAG gate (A11Y-3 #26). Boots the FastAPI app with
+    # CUBROX_TEST_SEED_ENABLED=true so the test-only seed router is
+    # mounted, then runs Playwright + axe-core against the reading
+    # surface across four preference variants. Zero serious/critical
+    # WCAG 2.0 A+AA violations is the merge gate.
+    #
+    # Scope: only triggers on the workflow's existing triggers (push to
+    # main, pull_request to main, workflow_call from preview-deploy.yml).
+    # No path filters — a change to templates/, app/, or pyproject.toml
+    # can all regress the surface, so always run.
+    name: a11y
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install Python dependencies
+        run: uv sync --extra dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'tests/a11y/package-lock.json'
+
+      - name: Install Node dependencies
+        working-directory: tests/a11y
+        run: npm ci
+
+      - name: Resolve Playwright version
+        id: playwright-version
+        working-directory: tests/a11y
+        # Read the pinned version from package-lock.json so the cache
+        # key changes when the bump lands.
+        run: |
+          version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers + OS deps
+        working-directory: tests/a11y
+        # `--with-deps` runs apt-get install for libglib/libnss/etc. on
+        # every job (not cached), but the heavy browser-binary download
+        # is gated by the cache step above.
+        run: npx playwright install --with-deps chromium
+
+      - name: Run accessibility tests
+        working-directory: tests/a11y
+        # CUBROX_TEST_SEED_ENABLED, SESSION_COOKIE_SECURE, and
+        # ENVIRONMENT are also set inside playwright.config.ts >
+        # webServer.env, so the FastAPI subprocess sees them
+        # regardless of whether the job-level env propagates.
+        env:
+          CUBROX_TEST_SEED_ENABLED: 'true'
+          SESSION_COOKIE_SECURE: 'false'
+          ENVIRONMENT: 'test'
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-report-${{ github.sha }}
+          path: tests/a11y/playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore

@@ -6,6 +6,7 @@ Run locally:
 Production (Cloud Run) runs the same command — see Dockerfile.
 """
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -53,3 +54,17 @@ app.include_router(todos.router)
 app.include_router(auth.router)
 app.include_router(passages.router)
 app.include_router(reading.router)
+
+# Test-only seed router (A11Y-2 #25). Loaded ONLY when explicitly
+# enabled via env var — production Cloud Run revisions never set this.
+# See app/api/test_seed.py for the module-level guardrail.
+if os.environ.get("CUBROX_TEST_SEED_ENABLED") == "true":
+    from app.api import test_seed  # noqa: PLC0415  intentional conditional import
+    from app.db import create_db_and_tables  # noqa: PLC0415  test-only path
+
+    # Ensure tables exist before the seed router writes to them. The
+    # a11y harness points at a throwaway SQLite file with no migrations
+    # applied; in production, this branch is never reached.
+    create_db_and_tables()
+
+    app.include_router(test_seed.router)

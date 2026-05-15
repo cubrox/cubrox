@@ -1,14 +1,26 @@
-"""Tests for the public landing page at GET /.
+"""Tests for the landing page at GET /.
 
-This is the ONLY public page on Cubrox — it must work without
-authentication and serve as the on-ramp to the magic-link sign-in
-flow (AUTH-1/2/3).
+The route serves two audiences:
+  - Anonymous visitors see the sign-in form (the on-ramp to AUTH-1/2/3).
+  - Signed-in visitors are redirected to /passages/new — the actual app
+    entry point. Without this branch, a returning user clicking a
+    bookmarked URL would land on the sign-in form and assume the page
+    was broken (BUG-2 #51).
+
+Tests in this file that don't seed a session cookie exercise the
+anonymous path; the dedicated `test_signed_in_visitor_redirects_to_passages_new`
+test exercises the signed-in branch.
 """
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
+from app.models.user import User
 from app.services.identity import magic_link
+from app.services.identity.session import SESSION_COOKIE_NAME, sign_session
+
+TEST_SECRET = "dev-only"
 
 
 @pytest.fixture(autouse=True)
@@ -33,12 +45,50 @@ def test_landing_page_returns_200_and_html(client: TestClient) -> None:
 
 
 def test_landing_page_does_not_require_auth(client: TestClient) -> None:
-    """The landing page is the only public URL. Unauthenticated requests
-    must NOT redirect to /login (that would be a redirect loop, since
-    /login is where someone gets the form to sign in from)."""
+    """The landing page is the public URL anonymous visitors see first.
+    A request with no session cookie must render the sign-in form (200),
+    NOT redirect anywhere — there's nowhere safe to redirect them to
+    (the sign-in form lives ON this page)."""
     response = client.get("/", follow_redirects=False)
     assert response.status_code == 200
     assert response.headers.get("location") is None
+
+
+def test_signed_in_visitor_redirects_to_passages_new(
+    client: TestClient,
+    session: Session,
+) -> None:
+    """Per BUG-2 (#51): a visitor with a valid session cookie should
+    skip the landing page and land directly on the paste/upload entry
+    point. Without this, returning users clicking bookmarked `/` see
+    the sign-in form and assume the site is broken."""
+    user = User(email="returning@example.com")
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    client.cookies.set(SESSION_COOKIE_NAME, sign_session(user_id=user.id, secret=TEST_SECRET))
+
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/passages/new"
+    # Critically, we did NOT render the sign-in form.
+    assert "<form" not in response.text
+
+
+def test_invalid_cookie_falls_back_to_landing_page(
+    client: TestClient,
+) -> None:
+    """A session cookie that doesn't verify (forged, expired, signed
+    with the wrong secret) should be treated as no-cookie — render
+    the sign-in form rather than 4xx the visitor. The soft-auth
+    `try_current_user` dep returns None for any verify failure."""
+    client.cookies.set(SESSION_COOKIE_NAME, "this-is-not-a-valid-cookie")
+
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 200
+    # Sign-in form rendered; no redirect.
+    assert response.headers.get("location") is None
+    assert "<form" in response.text
 
 
 def test_landing_page_renders_signin_form(client: TestClient) -> None:

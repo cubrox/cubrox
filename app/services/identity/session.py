@@ -150,3 +150,31 @@ def current_user(
                 )
 
     return user
+
+
+def try_current_user(
+    request: Request,
+    response: Response,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> User | None:
+    """Soft-auth variant of `current_user`: returns `User | None` instead of
+    raising on no/invalid session.
+
+    Use this when a route needs to render differently for signed-in vs.
+    anonymous visitors but should NOT trigger the AUTH-3 redirect for
+    anonymous ones (e.g. the landing page, which renders the sign-in
+    form for anonymous visitors and redirects authed visitors away).
+
+    Shares all cookie-verification logic with `current_user` so the
+    "is this session valid" rules stay in one place.
+    """
+    try:
+        return current_user(
+            request=request,
+            response=response,
+            session=session,
+            settings=settings,
+        )
+    except UnauthenticatedError:
+        return None

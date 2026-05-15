@@ -124,7 +124,11 @@ def verify(
     session.commit()
 
     cookie_value = sign_session(user_id=user_id, secret=settings.session_secret)
-    response = RedirectResponse(url="/", status_code=303)
+    # Drop the freshly-signed-in user on the paste/upload page (the
+    # actual app entry point), NOT the landing page. The landing page
+    # also redirects authed visitors here, but going via `/` would
+    # cause a needless second hop. See BUG-2 (#51).
+    response = RedirectResponse(url="/passages/new", status_code=303)
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=cookie_value,

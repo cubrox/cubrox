@@ -65,14 +65,18 @@ def _seed_active_token(
 # ---------------------------------------------------------------------------
 
 
-def test_valid_token_returns_303_redirect_to_root(
+def test_valid_token_returns_303_redirect_to_passages_new(
     client: TestClient,
     session: Session,
 ) -> None:
+    """Per BUG-2 (#51), the post-verify redirect lands on the
+    paste/upload page (the actual app entry point) rather than the
+    landing page (which would otherwise show the sign-in form to a
+    user who just signed in)."""
     _, raw_token = _seed_active_token(session)
     response = client.get(f"/auth/verify?token={raw_token}", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/"
+    assert response.headers["location"] == "/passages/new"
 
 
 def test_valid_token_sets_session_cookie(

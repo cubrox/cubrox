@@ -106,7 +106,7 @@ def send_magic_link_email(
         {
             "from": from_email,
             "to": [email],
-            "subject": "Sign in to Cubrox",
+            "subject": "Sign in to Master Key",
             "html": _build_html(link),
             "text": _build_text(link),
         }
@@ -117,11 +117,11 @@ def _build_html(link: str) -> str:
     # Inline styles only — most email clients strip <style> blocks.
     return (
         '<div style="font-family: system-ui, sans-serif; line-height: 1.5;">'
-        "<p>Click below to sign in to Cubrox.</p>"
+        "<p>Click below to sign in to Master Key.</p>"
         f'<p><a href="{link}" '
         'style="display:inline-block;padding:12px 20px;background:#1a73e8;'
         'color:#fff;text-decoration:none;border-radius:4px;">'
-        "Sign in to Cubrox</a></p>"
+        "Sign in to Master Key</a></p>"
         "<p>This link expires in 15 minutes. "
         "If you didn't request it, you can safely ignore this email.</p>"
         "</div>"
@@ -130,7 +130,7 @@ def _build_html(link: str) -> str:
 
 def _build_text(link: str) -> str:
     return (
-        "Sign in to Cubrox\n\n"
+        "Sign in to Master Key\n\n"
         f"{link}\n\n"
         "This link expires in 15 minutes. "
         "If you didn't request it, you can safely ignore this email."

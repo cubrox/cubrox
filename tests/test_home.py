@@ -118,12 +118,14 @@ def test_landing_page_signin_form_swaps_inline(client: TestClient) -> None:
     assert 'id="signin-form"' in body
 
 
-def test_landing_page_mentions_cubrox(client: TestClient) -> None:
+def test_landing_page_mentions_product_name(client: TestClient) -> None:
     """Basic branding sanity check — visiting the URL should make it
-    obvious you're looking at Cubrox, not the starter template's todo
-    demo."""
+    obvious you're looking at Master Key (the public product name),
+    not the starter template's todo demo. 'Cubrox' remains the
+    internal codebase identifier (repo name, package name) but is
+    no longer surfaced to users."""
     body = client.get("/").text
-    assert "Cubrox" in body
+    assert "Master Key" in body
 
 
 def test_landing_page_does_not_mention_todos(client: TestClient) -> None:

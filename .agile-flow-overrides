@@ -1,0 +1,30 @@
+# .agile-flow-overrides
+#
+# Files in syncDirectories that are intentionally customised for this fork.
+# template-sync.sh will never overwrite these.
+#
+# One path per line. Lines starting with # are comments.
+# Paths are relative to the repo root.
+
+# Agent prompts rewritten for GCP / FastAPI / Neon
+.claude/agents/github-ticket-worker.md
+.claude/agents/devops-engineer.md
+.claude/agents/system-architect.md
+
+# Commands with GCP-specific checks / instructions
+.claude/commands/doctor.md
+.claude/commands/bootstrap-architecture.md
+
+# GCP-specific scripts (these don't exist in upstream)
+scripts/provision-gcp-project.sh
+scripts/provision-gcp-project.test.sh
+scripts/provision-workshop-roster.sh
+scripts/provision-workshop-roster.test.sh
+scripts/workshop-setup.sh
+scripts/workshop-setup.test.sh
+scripts/workshop-teardown.sh
+scripts/workshop-teardown.test.sh
+scripts/diagnose-cloudrun.sh
+scripts/diagnose-cloudrun.test.sh
+scripts/setup-solo-mode.sh
+scripts/setup-solo-mode.test.sh

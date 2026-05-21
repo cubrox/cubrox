@@ -374,6 +374,19 @@ Use these templates when generating the documents:
 3. **Define "not building"** - Scope clarity prevents scope creep
 4. **Set measurable goals** - "Better UX" isn't measurable
 
+## Finish Up
+
+The following files were created:
+- docs/PRODUCT-REQUIREMENTS.md
+- docs/PRODUCT-ROADMAP.md
+
+Would you like me to commit these to a feature branch? (Recommended to keep `main` clean)
+
+If yes, I will:
+1. Create branch `docs/bootstrap-product`
+2. Commit with message `docs: add product requirements and roadmap`
+3. Push and offer to create a PR
+
 ## What Happens Next
 
 After completing this questionnaire:

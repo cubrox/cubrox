@@ -185,7 +185,11 @@ fi
 if CLAUDE_CMD=$(resolve_cmd claude); then
     pass "CLI Tools" "claude found at $CLAUDE_CMD"
 else
-    fail "CLI Tools" "claude not found" "npm install -g @anthropic-ai/claude-code"
+    if [[ "${CODESPACES:-}" == "true" ]] || [[ "${TERM_PROGRAM:-}" == "vscode" ]]; then
+        pass "CLI Tools" "claude CLI (IDE-provided via Claude Code extension)"
+    else
+        fail "CLI Tools" "claude not found" "npm install -g @anthropic-ai/claude-code"
+    fi
 fi
 
 # jq (FAIL)
@@ -241,16 +245,12 @@ else
     fail "Git Config" "user.email not set" "git config --global user.email \"you@example.com\""
 fi
 
-# core.hooksPath (FAIL when the hook file exists — pre-push gate dormant)
+# core.hooksPath (WARN)
 hooks_path=$(git config --local core.hooksPath 2>/dev/null || true)
 if [ "$hooks_path" = "scripts/hooks" ]; then
     pass "Git Config" "core.hooksPath set to scripts/hooks"
-elif [ -f "scripts/hooks/pre-push" ]; then
-    # Hook exists but is dormant — quality gate is not running. See #77.
-    fail "Git Config" "core.hooksPath is '${hooks_path:-unset}'; pre-push hook is dormant" "git config --local core.hooksPath scripts/hooks"
 else
-    # No hook file in repo — nothing to activate. Just note it.
-    warn "Git Config" "core.hooksPath is '${hooks_path:-unset}' (no scripts/hooks/pre-push present)" "git config --local core.hooksPath scripts/hooks"
+    warn "Git Config" "core.hooksPath is '${hooks_path:-unset}' (expected scripts/hooks)" "git config --local core.hooksPath scripts/hooks"
 fi
 
 # pre-push exists + executable (WARN)
@@ -292,23 +292,7 @@ else
     fail "GitHub Auth" "Not authenticated with gh" "Run: gh auth login"
 fi
 
-# Detect mode: solo (default) vs multi-bot. Solo mode is signaled by
-# AGILE_FLOW_SOLO_MODE=true OR by the absence of multi-bot env vars.
-# Multi-bot mode requires both AGILE_FLOW_WORKER_ACCOUNT and
-# AGILE_FLOW_REVIEWER_ACCOUNT to be set. See #87.
-if [ "${AGILE_FLOW_SOLO_MODE:-false}" = "true" ]; then
-    AGILE_FLOW_MODE="solo"
-elif [ -n "${AGILE_FLOW_WORKER_ACCOUNT:-}" ] && [ -n "${AGILE_FLOW_REVIEWER_ACCOUNT:-}" ]; then
-    AGILE_FLOW_MODE="multi-bot"
-else
-    # Neither solo nor fully-configured multi-bot: ambiguous default.
-    # Treat as solo (the framework default since #87) and surface the
-    # missing-env-vars as informational, not warnings.
-    AGILE_FLOW_MODE="solo"
-fi
-pass "GitHub Auth" "Mode: $AGILE_FLOW_MODE"
-
-# AGILE_FLOW_WORKER_ACCOUNT — required for multi-bot, irrelevant for solo
+# AGILE_FLOW_WORKER_ACCOUNT (WARN)
 if [ -n "${AGILE_FLOW_WORKER_ACCOUNT:-}" ]; then
     pass "GitHub Auth" "AGILE_FLOW_WORKER_ACCOUNT set: $AGILE_FLOW_WORKER_ACCOUNT"
 
@@ -322,13 +306,11 @@ if [ -n "${AGILE_FLOW_WORKER_ACCOUNT:-}" ]; then
     else
         warn "GitHub Auth" "Worker account ($AGILE_FLOW_WORKER_ACCOUNT) not in gh keyring" "Run: gh auth login for this account"
     fi
-elif [ "$AGILE_FLOW_MODE" = "multi-bot" ]; then
-    warn "GitHub Auth" "AGILE_FLOW_WORKER_ACCOUNT not set" "export AGILE_FLOW_WORKER_ACCOUNT=\"{org}-worker\""
 else
-    skip "GitHub Auth" "AGILE_FLOW_WORKER_ACCOUNT not set" "Not relevant in solo mode"
+    warn "GitHub Auth" "AGILE_FLOW_WORKER_ACCOUNT not set" "export AGILE_FLOW_WORKER_ACCOUNT=\"{org}-worker\""
 fi
 
-# AGILE_FLOW_REVIEWER_ACCOUNT — required for multi-bot, irrelevant for solo
+# AGILE_FLOW_REVIEWER_ACCOUNT (WARN)
 if [ -n "${AGILE_FLOW_REVIEWER_ACCOUNT:-}" ]; then
     pass "GitHub Auth" "AGILE_FLOW_REVIEWER_ACCOUNT set: $AGILE_FLOW_REVIEWER_ACCOUNT"
 
@@ -342,10 +324,8 @@ if [ -n "${AGILE_FLOW_REVIEWER_ACCOUNT:-}" ]; then
     else
         warn "GitHub Auth" "Reviewer account ($AGILE_FLOW_REVIEWER_ACCOUNT) not in gh keyring" "Run: gh auth login for this account"
     fi
-elif [ "$AGILE_FLOW_MODE" = "multi-bot" ]; then
-    warn "GitHub Auth" "AGILE_FLOW_REVIEWER_ACCOUNT not set" "export AGILE_FLOW_REVIEWER_ACCOUNT=\"{org}-reviewer\""
 else
-    skip "GitHub Auth" "AGILE_FLOW_REVIEWER_ACCOUNT not set" "Not relevant in solo mode"
+    warn "GitHub Auth" "AGILE_FLOW_REVIEWER_ACCOUNT not set" "export AGILE_FLOW_REVIEWER_ACCOUNT=\"{org}-reviewer\""
 fi
 
 # Final restore — ensure we always end on the original user
@@ -354,67 +334,6 @@ if [ -n "$ORIGINAL_GH_USER" ]; then
 fi
 
 fi  # end gh guard
-
-# Token env-var precedence audit (FAIL solo / WARN multi-bot)
-#
-# Outside the gh guard intentionally: token env vars matter even when
-# gh isn't installed yet (they would poison any future gh install).
-#
-# `gh` uses GITHUB_PERSONAL_ACCESS_TOKEN (any suffix) and GH_TOKEN above
-# its keyring whenever set. That makes `gh auth switch` silently
-# ineffective: the keyring's "active account" pointer updates, but
-# every gh call authenticates with the env-var token instead. In
-# solo mode this breaks agent workflows opaquely; in multi-bot it's
-# tolerable but still surprising.
-#
-# Also flags classic PATs (ghp_*) as a credential-hygiene WARN —
-# prefer fine-grained PATs (github_pat_*) which can scope to specific
-# repos and expire. See #84.
-#
-# Token preview (first 4...last 4) — never logs the full value.
-mask_token() {
-    local t="$1"
-    if [ ${#t} -ge 12 ]; then
-        echo "${t:0:4}...${t: -4}"
-    else
-        echo "(set, ${#t} chars)"
-    fi
-}
-
-# Build a list of "NAME=preview" entries for every detected token var.
-token_entries=()
-classic_pat_names=()
-while IFS= read -r entry; do
-    [ -z "$entry" ] && continue
-    name="${entry%%=*}"
-    value="${entry#*=}"
-    token_entries+=("${name}=$(mask_token "$value")")
-    # Classic PAT prefix: ghp_
-    if [[ "$value" == ghp_* ]]; then
-        classic_pat_names+=("$name")
-    fi
-done < <(env | grep -E "^(GITHUB_PERSONAL_ACCESS_TOKEN|GH_TOKEN)" || true)
-
-if [ ${#token_entries[@]} -eq 0 ]; then
-    pass "GitHub Auth" "No GITHUB_PERSONAL_ACCESS_TOKEN env vars (gh keyring is the source of truth)"
-else
-    # Build a one-line summary listing every detected var.
-    summary="$(IFS=', '; echo "${token_entries[*]}")"
-    if [ "${AGILE_FLOW_SOLO_MODE:-false}" = "true" ]; then
-        fail "GitHub Auth" "Token env vars override gh auth switch in solo mode: ${summary}" \
-            "Remove from your shell rc (and rotate the tokens). Helper: scripts/setup-solo-mode.sh audits these."
-    else
-        warn "GitHub Auth" "Token env vars override gh auth switch: ${summary}" \
-            "Multi-bot mode tolerates this if you understand the precedence."
-    fi
-fi
-
-# Classic-PAT hygiene check (WARN regardless of mode).
-if [ ${#classic_pat_names[@]} -gt 0 ]; then
-    classic_summary="$(IFS=', '; echo "${classic_pat_names[*]}")"
-    warn "GitHub Auth" "Classic PAT(s) detected: ${classic_summary}" \
-        "Prefer fine-grained PATs (github_pat_*); they scope to specific repos and expire."
-fi
 
 # ═══════════════════════════════════════════════════════════════════
 #  4. MCP Config
@@ -453,6 +372,19 @@ if [ -f ".mcp.json" ]; then
     fi  # end jq guard
 else
     fail "MCP Config" ".mcp.json not found" "Run bootstrap.sh Phase 0 to create it"
+fi
+
+# GITHUB_PERSONAL_ACCESS_TOKEN (WARN — optional, only needed for direct GraphQL API calls)
+if [ -n "${GITHUB_PERSONAL_ACCESS_TOKEN:-}" ]; then
+    # Mask the token in output — guard against short tokens
+    if [ ${#GITHUB_PERSONAL_ACCESS_TOKEN} -ge 12 ]; then
+        token_preview="${GITHUB_PERSONAL_ACCESS_TOKEN:0:4}...${GITHUB_PERSONAL_ACCESS_TOKEN: -4}"
+    else
+        token_preview="(set, ${#GITHUB_PERSONAL_ACCESS_TOKEN} chars)"
+    fi
+    pass "MCP Config" "GITHUB_PERSONAL_ACCESS_TOKEN set ($token_preview)"
+else
+    skip "MCP Config" "GITHUB_PERSONAL_ACCESS_TOKEN not set" "Optional — gh auth handles GitHub access"
 fi
 
 # ═══════════════════════════════════════════════════════════════════
@@ -545,6 +477,97 @@ for doc in PRODUCT-REQUIREMENTS.md PRODUCT-ROADMAP.md TECHNICAL-ARCHITECTURE.md;
         warn "Docs" "docs/$doc not found" "Created during bootstrap Phase 1-2"
     fi
 done
+
+# ═══════════════════════════════════════════════════════════════════
+#  9. Remote Checks (if gh CLI available and authenticated)
+# ═══════════════════════════════════════════════════════════════════
+section "Remote Checks"
+
+if ! GH_CMD=$(resolve_cmd gh); then
+    skip "Remote Checks" "All checks" "gh CLI not installed"
+elif ! "$GH_CMD" auth status &>/dev/null 2>&1; then
+    skip "Remote Checks" "All checks" "gh CLI not authenticated"
+else
+    # Extract owner/repo from git remote
+    remote_url=$(git remote get-url origin 2>/dev/null || true)
+    if [ -n "$remote_url" ]; then
+        # Parse GitHub repo from URL (supports both HTTPS and SSH)
+        if [[ "$remote_url" =~ github\.com[:/]([^/]+)/([^/]+)(\.git)?$ ]]; then
+            owner="${BASH_REMATCH[1]}"
+            repo="${BASH_REMATCH[2]}"
+            repo="${repo%.git}"  # Remove .git suffix if present
+            
+            # Branch Protection Rulesets
+            rulesets_response=$("$GH_CMD" api "repos/$owner/$repo/rulesets" 2>&1 || true)
+            if echo "$rulesets_response" | grep -q "HTTP 403"; then
+                warn "Remote Checks" "Branch protection rulesets" "Could not verify (token scope) — 403 Forbidden"
+            elif echo "$rulesets_response" | grep -q "HTTP 404"; then
+                warn "Remote Checks" "Branch protection rulesets" "Could not verify (resource not found) — 404 Not Found"
+            elif [ "$rulesets_response" = "[]" ] || [ -z "$rulesets_response" ]; then
+                warn "Remote Checks" "Branch protection rulesets" "No rulesets found — branch protection may not be configured"
+            else
+                # Check if any ruleset targets main branch (only if jq is available)
+                if JQ_CMD=$(resolve_cmd jq); then
+                    main_rulesets=$(echo "$rulesets_response" | "$JQ_CMD" -r '.[] | select(.target=="branch") | select(.conditions.ref_name.include[] | test("main|DEFAULT_BRANCH"))' 2>/dev/null || echo "")
+                    if [ -n "$main_rulesets" ]; then
+                        pass "Remote Checks" "Branch protection rulesets configured for main branch"
+                    else
+                        warn "Remote Checks" "Branch protection rulesets exist but may not protect main branch" "Verified — check ruleset configuration"
+                    fi
+                else
+                    pass "Remote Checks" "Branch protection rulesets found (jq not available for detailed analysis)"
+                fi
+            fi
+            
+            # Repository Secrets
+            secrets_response=$("$GH_CMD" secret list --repo "$owner/$repo" 2>&1 || true)
+            if echo "$secrets_response" | grep -q "HTTP 403"; then
+                warn "Remote Checks" "Repository secrets" "Could not verify (token scope) — 403 Forbidden"
+            elif echo "$secrets_response" | grep -q "HTTP 404"; then
+                warn "Remote Checks" "Repository secrets" "Could not verify (resource not found) — 404 Not Found"
+            else
+                # Check for common deployment secrets
+                secrets_found=0
+                for secret in RENDER_API_KEY RENDER_SERVICE_ID SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF; do
+                    if echo "$secrets_response" | grep -q "^$secret"; then
+                        secrets_found=$((secrets_found + 1))
+                    fi
+                done
+                if [ "$secrets_found" -gt 0 ]; then
+                    pass "Remote Checks" "Repository secrets configured ($secrets_found deployment secrets found)"
+                else
+                    warn "Remote Checks" "Repository secrets" "No deployment secrets found (RENDER_*, SUPABASE_*) — verified"
+                fi
+            fi
+            
+            # GitHub Project Board
+            projects_response=$("$GH_CMD" project list --owner "$owner" --format json 2>&1 || true)
+            if echo "$projects_response" | grep -q "HTTP 403"; then
+                warn "Remote Checks" "GitHub project board" "Could not verify (token scope) — 403 Forbidden"
+            elif echo "$projects_response" | grep -q "HTTP 404"; then
+                warn "Remote Checks" "GitHub project board" "Could not verify (resource not found) — 404 Not Found"
+            elif [ "$projects_response" = "[]" ] || [ -z "$projects_response" ]; then
+                warn "Remote Checks" "GitHub project board" "No project boards found — verified"
+            else
+                # Count projects (only if jq is available)
+                if JQ_CMD=$(resolve_cmd jq); then
+                    project_count=$(echo "$projects_response" | "$JQ_CMD" -r 'length' 2>/dev/null || echo "0")
+                    if [ "$project_count" -gt 0 ] 2>/dev/null; then
+                        pass "Remote Checks" "GitHub project board configured ($project_count project(s) found)"
+                    else
+                        warn "Remote Checks" "GitHub project board" "Could not parse project list response"
+                    fi
+                else
+                    pass "Remote Checks" "GitHub project board found (jq not available for detailed analysis)"
+                fi
+            fi
+        else
+            skip "Remote Checks" "All checks" "Could not parse GitHub repo from remote URL: $remote_url"
+        fi
+    else
+        skip "Remote Checks" "All checks" "No git remote origin configured"
+    fi
+fi
 
 # ═══════════════════════════════════════════════════════════════════
 #  Summary

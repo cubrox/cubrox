@@ -47,6 +47,34 @@ latest upstream release. User content is never modified.
      gh pr view <PR_NUMBER> --web
    ```
 
+## Rollback
+
+Before any file mutation, `template-sync.sh` creates a local-only tag named
+`pre-upgrade-YYYYMMDD-HHMMSS` pointing at HEAD. The script's final summary
+prints the exact recovery command, for example:
+
+```
+Rollback: git reset --hard pre-upgrade-20260511-213045
+```
+
+If the sync PR contains a broken file, an unwanted upstream change, or a
+lost customization, recover with:
+
+```bash
+git reset --hard pre-upgrade-YYYYMMDD-HHMMSS
+```
+
+Tags are **not pushed to the remote** — they stay local so upstream tag
+namespaces remain clean. List your local rollback points anytime:
+
+```bash
+git tag --list 'pre-upgrade-*'
+```
+
+If the sync PR has already been merged to `main`, the rollback approach is
+to `git revert` the merge commit on a new branch instead — the local tag
+only restores your local working tree, not the published merge.
+
 ## Important
 
 - This command calls `scripts/template-sync.sh` as-is. Do not modify the script.

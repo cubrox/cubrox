@@ -53,6 +53,10 @@ Post a structured review comment using this format:
 - [ ] Edge cases considered where appropriate
 - [ ] All tests pass in CI
 
+### Tracking Issue Hygiene
+- [ ] Any tracking issue linked in the PR has a close-out comment
+- [ ] Tracking issue is closed, or explicitly marked for close-on-merge
+
 ### Security
 - [ ] No hardcoded secrets, tokens, or credentials
 - [ ] No SQL injection, XSS, or command injection vectors
@@ -79,6 +83,7 @@ Any of these findings result in an immediate NO-GO recommendation:
 |----------|-----|
 | Hardcoded secrets or API keys | Security — credentials must never be in source |
 | Failing CI checks | Quality — all checks must pass before review |
+| Linked tracking issue lacks close-out comment/closure plan | Process — unresolved coordination context before merge |
 | SQL injection or command injection | Security — OWASP Top 10 vulnerability |
 | Disabled security controls | Safety — `--no-verify`, disabled hooks, bypassed auth |
 | Direct commits to main | Process — all changes go through feature branches |

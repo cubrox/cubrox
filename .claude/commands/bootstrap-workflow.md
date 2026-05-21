@@ -33,40 +33,6 @@ Verify or create project board with columns:
 - **In Review** - PR created, awaiting review
 - **Done** - Merged and complete
 
-### 1.5. Enable Auto-Move-to-Done Workflow (manual)
-
-After the project board exists, enable the built-in
-**"Item closed → Status: Done"** workflow so issues auto-move to
-Done when their PR merges (PR body has `Closes #N` → GitHub
-auto-closes the issue → built-in workflow bumps the Status column).
-
-Without this step, every merged PR leaves its issue stuck in **In
-Review** until a human manually drags it to Done — the framework's
-"only humans move to Done" rule is honored, but the human has to
-remember to do it on every merge. Enabling this workflow once
-per-project removes that per-merge step.
-
-**Manual UI toggle (recommended):**
-
-1. Open the project: `https://github.com/orgs/<org>/projects/<N>`
-   (or the user-scoped equivalent)
-2. Click **⋯** (top-right) → **Workflows**
-3. Find **"Item closed"**
-4. Set **When** = `Issue is closed`
-5. Set **Set Status** = `Done`
-6. Toggle **Enabled**
-7. Click **Save and turn on workflow**
-
-**Why not via API:** GitHub's GraphQL exposes
-`projectV2.workflows` for read and `deleteProjectV2Workflow` for
-removal, but no `createProjectV2Workflow` or
-`updateProjectV2Workflow` mutation exists. Built-in workflows can
-only be configured via the web UI. See #86 for the API research.
-
-If the user can't access the UI right now, document that the toggle
-is pending and set a follow-up reminder; the framework still works
-without it (just with manual board-moves on merge).
-
 ### 2. Branch Protection Configuration
 
 Verify or configure branch protection on `main`:

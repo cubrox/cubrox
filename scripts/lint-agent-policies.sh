@@ -214,29 +214,23 @@ echo ""
 # Check 6: Bot account identity instructions
 # =============================================================================
 
-echo "Checking for account-identity instructions..."
+echo "Checking for bot account identity instructions..."
 MISSING_IDENTITY=0
 
-# Workflow agents must address account identity. Either pattern is acceptable:
-#   - "gh auth status" / "active account" — verify-only (solo-mode-aware, #82)
-#   - "gh auth switch" / "GitHub Account Identity" / "bot...account" — multi-bot
-# The verify-only patterns are preferred (don't mutate global gh state); the
-# bot-account patterns are accepted for backward compatibility with multi-bot
-# setups that pre-date #82.
 for file in .claude/agents/pr-reviewer.md .claude/agents/github-ticket-worker.md; do
   if [ -f "$file" ]; then
-    if ! grep -qi "gh auth status\|gh auth switch\|active.*account\|GitHub Account Identity\|bot.*account" "$file"; then
-      echo -e "${YELLOW}WARNING: $file may be missing account-identity instructions${NC}"
+    if ! grep -qi "gh auth switch\|GitHub Account Identity\|bot.*account" "$file"; then
+      echo -e "${YELLOW}WARNING: $file may be missing bot account identity instructions${NC}"
       WARNINGS=$((WARNINGS + 1))
       MISSING_IDENTITY=1
     else
-      verbose_log "Found account-identity instructions in $(basename "$file")"
+      verbose_log "Found bot account instructions in $(basename "$file")"
     fi
   fi
 done
 
 if [ $MISSING_IDENTITY -eq 0 ]; then
-  echo -e "${GREEN}Account-identity instructions found in workflow agent files${NC}"
+  echo -e "${GREEN}Bot account identity instructions found in workflow agent files${NC}"
 fi
 
 echo ""

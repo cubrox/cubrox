@@ -17,10 +17,6 @@ the user if any check fails — do not continue with partial tooling.
 2. **GitHub account is correct** — Run `gh auth status` and confirm the active
    account matches the expected worker/bot account. If only a personal account
    is active, STOP and instruct the user to run `scripts/ensure-github-account.sh`.
-   **Solo mode exception:** if `AGILE_FLOW_SOLO_MODE=true` is set, this check
-   is skipped — the participant uses one personal account for both worker and
-   reviewer roles. This is the workshop/tutorial path. The bot-account
-   separation is the production architecture.
 3. **Claude hooks are registered** — Check that hook files referenced in
    `.claude/settings.local.json` exist and are executable. WARN if any hook is
    missing or not executable.

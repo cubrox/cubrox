@@ -151,33 +151,15 @@ You are a master of:
 
 ## Project-Specific Context
 
-- **Product**: Cubrox — configurable reading surface for neurodivergent readers of Baha'i writings. PRD: [docs/PRODUCT-REQUIREMENTS.md](../../docs/PRODUCT-REQUIREMENTS.md). Architecture: [docs/TECHNICAL-ARCHITECTURE.md](../../docs/TECHNICAL-ARCHITECTURE.md).
-- **Architecture**: Server-rendered FastAPI monolith on Cloud Run; HTMX for in-page interactivity; Neon Postgres via SQLModel + Alembic. No SPA, no JavaScript build.
+<!--
+TEMPLATE: Fill in project-specific testing context here when using this template.
 
-- **Testing stack**:
-  - **`pytest` + `pytest-asyncio` + `pytest-cov`** — primary test runner. Config in `pyproject.toml`; `testpaths = ["tests"]`, `asyncio_mode = "auto"`.
-  - **`fastapi.testclient.TestClient` + `httpx`** — HTTP-level tests. The `get_session` dependency is overridden to yield sessions bound to an in-memory SQLite database (StaticPool). Each test gets a fresh database. Pattern: see `## FastAPI Testing Guidance` in `.claude/commands/bootstrap-architecture.md` and the consolidated form in [docs/TECHNICAL-ARCHITECTURE.md](../../docs/TECHNICAL-ARCHITECTURE.md).
-  - **Playwright + `@axe-core/playwright`** — accessibility smoke tests for the reading surface. Lives under `tests/a11y/`; runs in CI on every PR. The Node toolchain is **only** for these tests; production stays Node-free.
-  - **`pytest-mock` (or `unittest.mock`)** — mock the `anthropic.Anthropic` client at every test site. The real Anthropic API is **never** called in CI. Optional `tests/integration/` directory hits the real API behind an env-var gate, run only manually.
-
-- **Key test areas (MVP P0)**:
-  1. **Reading surface** — preference application (CSS variable swap renders correctly), font/size/contrast/spacing/line-height combinations, bionic-emphasis rendering when enabled.
-  2. **Auth** — magic-link issuance (token hashed at rest, single-use, 15-min TTL, rate-limited), session cookie attributes (`HttpOnly`, `Secure`, `SameSite=Lax`), cross-user data isolation.
-  3. **Passage ingestion** — paste path, PDF upload (size cap at 25 MB, malformed PDF surfaces clear error per Risk #3), text-hash idempotency.
-  4. **Comprehension questions** — cache hit returns without hitting LLM, cache miss invokes wrapper service (mocked), input >4,000 tokens is rejected before SDK call, prompt caching headers set.
-  5. **Reading-event metric** — events recorded on session close, `lines_processed` counted from rendered output, dashboard query returns aggregate against the 100k target.
-  6. **Accessibility (axe-core)** — reading surface passes with zero serious/critical violations. Run on every preference combination class (default, high-contrast, large-text, bionic).
-  7. **HTMX contract** — fragment routes return fragments (no `<html`), full-page routes return chrome, `HX-Request` header switches templates correctly.
-
-- **Coverage threshold**: **80%** on `app/` (enforced via `pytest-cov`). New code added without tests is a quality blocker.
-
-- **Critical quality concerns**:
-  - **WCAG conformance** is a defining product requirement, not a checkbox. An axe-core failure on the reading surface is a **blocking** finding.
-  - **Per-user privacy**: passages may include sacred text and personal uploads. Any test that touches cross-user reads or writes is verifying a security boundary, not just behavior.
-  - **LLM cost containment**: tests for the question generator must verify the cache-first path. A regression that bypasses the cache could silently 10x monthly Anthropic spend.
-  - **Performance NFR**: <100 ms perceived latency for view changes. Flag any test that is slow to set up — the production hot path likely is too.
-  - **PDF ingestion fragility** (Risk #3 in PRD): test against representative documents, not just synthetic fixtures. A PDF that produces empty text must surface a clear, accessible error to the user.
-  - **Comprehension-question quality on poetic text** (Risk #2): integration tests against a small curated set of Baha'i passages, run manually before each release. LLM-as-judge is not sufficient for sacred text — human review is required for the question-quality gate.
+Example fields to populate:
+- **Architecture**: [Description of the application architecture]
+- **Testing Stack**: [Testing frameworks and tools used]
+- **Key Test Areas**: [Core areas requiring testing]
+- **Critical Quality Concerns**: [Project-specific quality priorities]
+-->
 
 ## Quality Standards
 

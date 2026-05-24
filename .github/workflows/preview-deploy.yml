@@ -110,19 +110,11 @@ jobs:
           fi
           echo "Neon db_url_with_pooler is populated; proceeding to migrations."
 
-      - name: Install uv
-        if: steps.check_secrets.outputs.skip != 'true' && steps.check_secrets.outputs.neon_configured == 'true'
-        uses: astral-sh/setup-uv@v5
-        with:
-          version: "0.5.x"
-
-      - name: Run Alembic migrations against branch database
-        if: steps.check_secrets.outputs.skip != 'true' && steps.check_secrets.outputs.neon_configured == 'true'
-        env:
-          DATABASE_URL: ${{ steps.neon.outputs.db_url_with_pooler }}
-        run: |
-          uv sync --frozen
-          uv run alembic upgrade head
+      # Schema migrations for the preview environment now run via the
+      # Supabase GitHub App auto-branching integration (per SUPA-1 /
+      # #80). The alembic chain was deleted in SUPA-2b / #87. The Neon
+      # branch creation step above is still here because SUPA-4 (#83)
+      # hasn't yet swapped preview DB infra to Supabase branches.
 
       # ── GCP: auth and build image ─────────────────────────────────────
 

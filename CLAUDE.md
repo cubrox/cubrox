@@ -188,8 +188,6 @@ uv run ruff format .                             # Format
 uv run mypy app/                                 # Type check
 uv run pytest                                    # Tests
 uv run pytest --cov=app --cov-report=term-missing # Tests with coverage
-uv run alembic upgrade head                      # Apply migrations
-uv run alembic revision --autogenerate -m "msg"  # Create a new migration
 supabase start                                   # Start local Supabase stack (needs Docker)
 supabase stop                                    # Stop local Supabase stack
 supabase status                                  # Show local stack URLs + keys

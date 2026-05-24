@@ -195,6 +195,14 @@ jobs:
             ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
             MAGIC_LINK_BASE_URL=${{ vars.MAGIC_LINK_BASE_URL || 'https://agile-flow-app-heo5ry7rua-uc.a.run.app' }}
             MAGIC_LINK_FROM_EMAIL=${{ vars.MAGIC_LINK_FROM_EMAIL || 'onboarding@resend.dev' }}
+          # SUPA-3 (#82): mount Supabase credentials from GCP Secret
+          # Manager at runtime. Provisioned in SUPA-1 (#80) +
+          # operator-side setup. The runtime SA already has the
+          # secretAccessor binding for these specific secrets.
+          secrets: |
+            SUPABASE_URL=supabase-url:latest
+            SUPABASE_ANON_KEY=supabase-anon-key:latest
+            SUPABASE_SERVICE_KEY=supabase-service-key:latest
 
       - name: Route traffic to latest revision
         # success() gates on all prior steps succeeding — without it,

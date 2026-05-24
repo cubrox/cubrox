@@ -204,6 +204,15 @@ jobs:
           # pipefail is required so gcloud failures aren't masked by tee.
           set -o pipefail
           DEPLOY_LOG=$(mktemp)
+          # SUPA-3 (#82): mount the Supabase credentials from GCP Secret
+          # Manager as env vars at runtime. The secrets (supabase-url,
+          # supabase-anon-key, supabase-service-key) were provisioned
+          # in SUPA-1 (#80). The runtime SA has the
+          # roles/secretmanager.secretAccessor binding from #80 setup.
+          # Each PR preview shares the same Supabase project / Auth
+          # instance — there's no per-PR Supabase env yet (SUPA-4 would
+          # add per-PR auth project if the redirect-allowlist UX needed
+          # it; today the prod allowlist covers preview URLs).
           gcloud run deploy "${{ env.SERVICE_NAME }}" \
             --image="${{ steps.build.outputs.image }}" \
             --region="${{ env.GCP_REGION }}" \
@@ -216,7 +225,8 @@ jobs:
             --min-instances=0 \
             --max-instances=3 \
             --allow-unauthenticated \
-            --set-env-vars="${ENV_VARS}" 2>&1 | tee "$DEPLOY_LOG"
+            --set-env-vars="${ENV_VARS}" \
+            --set-secrets="SUPABASE_URL=supabase-url:latest,SUPABASE_ANON_KEY=supabase-anon-key:latest,SUPABASE_SERVICE_KEY=supabase-service-key:latest" 2>&1 | tee "$DEPLOY_LOG"
 
           PREVIEW_URL=$(grep -oE 'https://pr-[0-9]+---[^ ]+\.run\.app' "$DEPLOY_LOG" | head -n1)
 

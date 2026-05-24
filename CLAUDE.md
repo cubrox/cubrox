@@ -190,6 +190,10 @@ uv run pytest                                    # Tests
 uv run pytest --cov=app --cov-report=term-missing # Tests with coverage
 uv run alembic upgrade head                      # Apply migrations
 uv run alembic revision --autogenerate -m "msg"  # Create a new migration
+supabase start                                   # Start local Supabase stack (needs Docker)
+supabase stop                                    # Stop local Supabase stack
+supabase status                                  # Show local stack URLs + keys
+supabase db reset                                # Reset local DB and re-apply migrations
 docker build -t agile-flow-app .                 # Local container build
 ```
 

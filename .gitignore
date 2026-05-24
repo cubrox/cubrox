@@ -56,6 +56,10 @@ logs/
 
 # Project-specific ignores (add below this line)
 
+# The framework rule `.env.*` above ignores all dotted env files; un-ignore the
+# committed template so contributors can `cp .env.example .env`.
+!.env.example
+
 # Workshop roster — input + generated output. Contains participant emails;
 # never commit. Use scripts/roster.example.csv as the format reference.
 roster.csv

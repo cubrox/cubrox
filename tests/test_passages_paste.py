@@ -20,21 +20,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.models.passage import Passage
-from app.models.user import User
-from app.services.identity.session import SESSION_COOKIE_NAME, sign_session
-
-TEST_SECRET = "dev-only"
-
-
-def _signed_in(client: TestClient, session: Session, email: str = "reader@example.com") -> User:
-    """Seed a User and set a valid session cookie on the client."""
-    user = User(email=email)
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    client.cookies.set(SESSION_COOKIE_NAME, sign_session(user_id=user.id, secret=TEST_SECRET))
-    return user
-
+from tests.conftest import signed_in
 
 # ---------------------------------------------------------------------------
 # Happy path
@@ -42,7 +28,7 @@ def _signed_in(client: TestClient, session: Session, email: str = "reader@exampl
 
 
 def test_post_passage_redirects_to_read_route(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     response = client.post("/passages", data={"text": "Hello, world."}, follow_redirects=False)
     assert response.status_code == 303
 
@@ -55,7 +41,7 @@ def test_post_passage_redirects_to_read_route(client: TestClient, session: Sessi
 
 
 def test_passage_row_has_correct_fields(client: TestClient, session: Session) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     text = "O Son of Spirit! My first counsel is this..."
 
     client.post("/passages", data={"text": text}, follow_redirects=False)
@@ -73,7 +59,7 @@ def test_text_hash_matches_sha256_of_submitted_bytes(client: TestClient, session
     """The hash must be derived from the EXACT submitted bytes — no
     strip, no lowercase. This is the property that makes cross-user
     cache hits work."""
-    _signed_in(client, session)
+    signed_in(session)
     text = "  the quick brown fox\nJUMPED over the lazy dog  "
 
     client.post("/passages", data={"text": text}, follow_redirects=False)
@@ -84,7 +70,7 @@ def test_text_hash_matches_sha256_of_submitted_bytes(client: TestClient, session
 
 
 def test_text_hash_is_thirty_two_bytes(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     client.post("/passages", data={"text": "x"}, follow_redirects=False)
     passages = session.exec(select(Passage)).all()
     assert len(passages[0].text_hash) == 32  # SHA-256 is exactly 32 bytes
@@ -96,21 +82,21 @@ def test_text_hash_is_thirty_two_bytes(client: TestClient, session: Session) -> 
 
 
 def test_empty_text_returns_422(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     response = client.post("/passages", data={"text": ""}, follow_redirects=False)
     assert response.status_code == 422
 
 
 def test_text_at_limit_succeeds(client: TestClient, session: Session) -> None:
     """The boundary case: exactly 100,000 chars must still succeed."""
-    _signed_in(client, session)
+    signed_in(session)
     text = "a" * 100_000
     response = client.post("/passages", data={"text": text}, follow_redirects=False)
     assert response.status_code == 303
 
 
 def test_text_over_limit_returns_422(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     text = "a" * 100_001
     response = client.post("/passages", data={"text": text}, follow_redirects=False)
     assert response.status_code == 422
@@ -144,20 +130,13 @@ def test_same_text_from_two_users_creates_two_distinct_rows(
     """Different users pasting the same text get separate Passage rows
     (no cross-user dedup at the row level — only the comprehension cache
     is shared, via text_hash)."""
-    user_a = User(email="a@example.com")
-    user_b = User(email="b@example.com")
-    session.add(user_a)
-    session.add(user_b)
-    session.commit()
-    session.refresh(user_a)
-    session.refresh(user_b)
-
+    user_a = signed_in(session, email="a@example.com")
     same_text = "The same passage, pasted by two different readers."
-
-    client.cookies.set(SESSION_COOKIE_NAME, sign_session(user_id=user_a.id, secret=TEST_SECRET))
     client.post("/passages", data={"text": same_text}, follow_redirects=False)
 
-    client.cookies.set(SESSION_COOKIE_NAME, sign_session(user_id=user_b.id, secret=TEST_SECRET))
+    # Swap who's "current" for the second post — signed_in resets the
+    # dependency override to the new user.
+    user_b = signed_in(session, email="b@example.com")
     client.post("/passages", data={"text": same_text}, follow_redirects=False)
 
     passages = session.exec(select(Passage)).all()
@@ -173,7 +152,7 @@ def test_same_text_from_two_users_creates_two_distinct_rows(
 
 
 def test_get_passages_new_renders_form(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     response = client.get("/passages/new")
 
     assert response.status_code == 200
@@ -190,6 +169,6 @@ def test_get_passages_new_form_includes_required_attribute(
     """Browsers should refuse to submit an empty textarea client-side
     too — server validation is the gate, but the HTML attribute is the
     UX courtesy."""
-    _signed_in(client, session)
+    signed_in(session)
     response = client.get("/passages/new")
     assert "required" in response.text

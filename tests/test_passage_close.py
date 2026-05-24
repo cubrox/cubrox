@@ -18,19 +18,7 @@ from sqlmodel import Session, select
 
 from app.models.passage import Passage
 from app.models.reading_event import ReadingEvent
-from app.models.user import User
-from app.services.identity.session import SESSION_COOKIE_NAME, sign_session
-
-TEST_SECRET = "dev-only"
-
-
-def _signed_in(client: TestClient, session: Session, email: str = "reader@example.com") -> User:
-    user = User(email=email)
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    client.cookies.set(SESSION_COOKIE_NAME, sign_session(user_id=user.id, secret=TEST_SECRET))
-    return user
+from tests.conftest import make_user, signed_in
 
 
 def _make_passage(
@@ -55,7 +43,7 @@ def _make_passage(
 
 
 def test_close_inserts_reading_event_and_returns_204(client: TestClient, session: Session) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.post(f"/passages/{passage.id}/close", data={"lines": 42})
@@ -73,7 +61,7 @@ def test_close_inserts_reading_event_and_returns_204(client: TestClient, session
 
 def test_close_with_lines_at_lower_bound_persists(client: TestClient, session: Session) -> None:
     """`lines=1` is the minimum allowed value (the route's CHECK is >= 1)."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.post(f"/passages/{passage.id}/close", data={"lines": 1})
@@ -87,7 +75,7 @@ def test_close_with_lines_at_lower_bound_persists(client: TestClient, session: S
 def test_close_with_lines_at_upper_bound_persists(client: TestClient, session: Session) -> None:
     """`lines=100_000` is the maximum allowed value (matches the
     INGEST-1 paste cap)."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.post(f"/passages/{passage.id}/close", data={"lines": 100_000})
@@ -109,13 +97,10 @@ def test_close_on_other_users_passage_returns_404_no_row(
     """Same 404 + same body as cross-user GET /read. Existence isn't
     leaked, and crucially no reading_event row is attributed to the
     wrong user."""
-    _signed_in(client, session)
+    signed_in(session)
     # The signed-in user is irrelevant to the passage we'll target —
     # create a separate user and a passage they own.
-    other = User(email="someone-else@example.com")
-    session.add(other)
-    session.commit()
-    session.refresh(other)
+    other = make_user(session, email="someone-else@example.com")
     other_passage = _make_passage(session, other.id)
 
     response = client.post(f"/passages/{other_passage.id}/close", data={"lines": 5})
@@ -130,7 +115,7 @@ def test_close_on_nonexistent_passage_returns_404_no_row(
 ) -> None:
     """A UUID that doesn't exist gets the same 404 as a cross-user
     passage. Same code path."""
-    _signed_in(client, session)
+    signed_in(session)
     response = client.post(
         f"/passages/{uuid.uuid4()}/close",
         data={"lines": 5},
@@ -147,7 +132,7 @@ def test_close_on_nonexistent_passage_returns_404_no_row(
 def test_close_with_lines_zero_silently_rejected(client: TestClient, session: Session) -> None:
     """`lines=0` is meaningless noise. The unload path can't surface
     errors, so the route returns 204 + drops the data + logs a WARN."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.post(f"/passages/{passage.id}/close", data={"lines": 0})
@@ -156,7 +141,7 @@ def test_close_with_lines_zero_silently_rejected(client: TestClient, session: Se
 
 
 def test_close_with_lines_negative_silently_rejected(client: TestClient, session: Session) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.post(f"/passages/{passage.id}/close", data={"lines": -1})
@@ -168,7 +153,7 @@ def test_close_with_lines_over_max_silently_rejected(client: TestClient, session
     """100_001 is one above the cap. Mirrors INGEST-1's text-length
     limit; anything higher means the client is lying or the
     measurement broke."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.post(
@@ -225,7 +210,7 @@ def test_reading_view_template_contains_close_beacon(client: TestClient, session
     """The reading view must emit the hidden close-beacon div pointed
     at the right URL. Without this, the route exists but no client
     ever calls it."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")
@@ -242,7 +227,7 @@ def test_reading_view_template_contains_line_count_script(
     """The inline <script> that measures the rendered <article>'s
     height and sets window.cubroxLineCount must be present. Pin it
     so a future refactor doesn't silently drop the measurement."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     body = client.get(f"/read/{passage.id}").text

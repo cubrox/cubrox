@@ -1,203 +1,133 @@
-"""Tests for the current_user dependency.
+"""Tests for the `current_user` FastAPI dependency (Supabase path).
 
-Covers the Definition of Done from issue #11 (AUTH-3):
-  - Auth-protected route + valid cookie → 200 with the right user
-  - Missing cookie + browser request → 303 to /login
-  - Missing cookie + HX-Request: true → 200 + HX-Redirect: /login
-  - Tampered cookie → 303 (browser) / HX-Redirect (HTMX)
-  - Cookie issued > 7 days ago → accepted AND re-issued (Set-Cookie present)
-  - Cookie issued <= 7 days ago → accepted, NO re-issue
-  - Cookie whose user_id is not in DB → 303
-  - Malformed user_id in cookie → 303
+After SUPA-3 (#82), `current_user` is dual-path:
+  1. Supabase JWT cookie (`sb-access-token`) — validated via Supabase
+     Auth, then a lazy `_ensure_neon_user_mirror` upserts a row in the
+     legacy `user` table so every other route keeps seeing the same
+     `User` SQLModel.
+  2. Legacy itsdangerous cookie — covered indirectly by the many
+     tests that use `signed_in(session)` to authenticate (which
+     overrides `current_user` via `app.dependency_overrides`, exercising
+     the same dependency-resolution path).
 
-The /api/me route is the canonical test target — it's protected by
-Depends(current_user) and returns {id, email} for the signed-in user.
+This file focuses on path 1 — the Supabase half — since path 2 is
+exercised across the whole test suite. After SUPA-2c (#91) deletes
+the legacy fallback, only path 1 remains and this file stays valid.
+
+Rewritten in SUPA-5 (#84). The pre-SUPA-3 tests covered the
+itsdangerous signature / reissue / tamper semantics that no longer
+apply.
 """
 
-import uuid
-from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.models.user import User
-from app.services.identity.session import (
-    SESSION_COOKIE_NAME,
-    _serializer,
-    sign_session,
-)
 
-# Test environment uses the config default SESSION_SECRET ("dev-only").
-TEST_SECRET = "dev-only"
+SUPABASE_COOKIE = "sb-access-token"
 
 
-def _seed_user(session: Session, email: str = "reader@example.com") -> User:
-    user = User(email=email)
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    return user
+def test_valid_supabase_jwt_returns_user_info(
+    client: TestClient, supabase_mock: MagicMock
+) -> None:
+    """The happy path. A valid Supabase JWT cookie → /api/me returns
+    the user's id + email. The lazy mirror creates a corresponding
+    Neon User row keyed on the Supabase user.id."""
+    fake_id = str(uuid4())
+    fake_user = SimpleNamespace(id=fake_id, email="reader@example.com")
+    supabase_mock.auth.get_user.return_value = SimpleNamespace(user=fake_user)
+    client.cookies.set(SUPABASE_COOKIE, "valid-jwt")
 
-
-def _craft_cookie_with_issued_at(
-    *, user_id: uuid.UUID, issued_at: datetime, secret: str = TEST_SECRET
-) -> str:
-    """Sign a cookie with an explicit issued_at field.
-
-    Used to test the rolling re-issue logic. The signature timestamp is
-    `now` (so max_age verification passes), but the payload's issued_at
-    can be back-dated to trigger the re-issue branch.
-    """
-    payload = {"user_id": str(user_id), "issued_at": issued_at.isoformat()}
-    return _serializer(secret).dumps(payload)
-
-
-# ---------------------------------------------------------------------------
-# Happy path
-# ---------------------------------------------------------------------------
-
-
-def test_valid_cookie_returns_user_info(client: TestClient, session: Session) -> None:
-    user = _seed_user(session, email="reader@example.com")
-    cookie = sign_session(user_id=user.id, secret=TEST_SECRET)
-
-    client.cookies.set(SESSION_COOKIE_NAME, cookie)
     response = client.get("/api/me")
-
     assert response.status_code == 200
     body = response.json()
-    assert body["id"] == str(user.id)
     assert body["email"] == "reader@example.com"
+    assert body["id"] == fake_id
 
 
-# ---------------------------------------------------------------------------
-# Unauthenticated → 303 (browser) / HX-Redirect (HTMX)
-# ---------------------------------------------------------------------------
+def test_lazy_mirror_creates_neon_user_row(
+    client: TestClient, session: Session, supabase_mock: MagicMock
+) -> None:
+    """First time a given Supabase user hits a protected route, the
+    shim should insert a `User` row whose PK matches the Supabase
+    user.id."""
+    fake_id = str(uuid4())
+    fake_user = SimpleNamespace(id=fake_id, email="newcomer@example.com")
+    supabase_mock.auth.get_user.return_value = SimpleNamespace(user=fake_user)
+    client.cookies.set(SUPABASE_COOKIE, "valid-jwt")
+
+    # Before: no row for this id.
+    import uuid as _uuid
+
+    assert session.get(User, _uuid.UUID(fake_id)) is None
+
+    client.get("/api/me")
+
+    # After: row exists with the email Supabase reported.
+    row = session.get(User, _uuid.UUID(fake_id))
+    assert row is not None
+    assert row.email == "newcomer@example.com"
 
 
-def test_missing_cookie_browser_request_redirects_to_landing(client: TestClient) -> None:
+def test_lazy_mirror_is_idempotent(
+    client: TestClient, session: Session, supabase_mock: MagicMock
+) -> None:
+    """Two requests for the same user → still one row, no IntegrityError."""
+    fake_id = str(uuid4())
+    fake_user = SimpleNamespace(id=fake_id, email="returning@example.com")
+    supabase_mock.auth.get_user.return_value = SimpleNamespace(user=fake_user)
+    client.cookies.set(SUPABASE_COOKIE, "valid-jwt")
+
+    client.get("/api/me")
+    client.get("/api/me")
+
+    import uuid as _uuid
+
+    rows = session.exec(select(User).where(User.id == _uuid.UUID(fake_id))).all()  # type: ignore[arg-type]
+    assert len(rows) == 1
+
+
+def test_missing_cookie_browser_request_redirects_to_landing(
+    client: TestClient,
+) -> None:
+    """No cookies of either kind → 303 to /. The dual-path falls
+    through both branches before raising UnauthenticatedError, which
+    the app-level handler converts to a redirect."""
     response = client.get("/api/me", follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/"
 
 
 def test_missing_cookie_htmx_request_returns_hx_redirect(client: TestClient) -> None:
-    response = client.get("/api/me", headers={"HX-Request": "true"}, follow_redirects=False)
+    """HTMX requests get the HX-Redirect header (HTMX intercepts the
+    response before the browser sees a real redirect)."""
+    response = client.get("/api/me", headers={"HX-Request": "true"})
     assert response.status_code == 200
-    assert response.headers.get("hx-redirect") == "/"
+    assert response.headers["HX-Redirect"] == "/"
 
 
-def test_tampered_cookie_browser_request_redirects(client: TestClient, session: Session) -> None:
-    user = _seed_user(session)
-    cookie = sign_session(user_id=user.id, secret=TEST_SECRET) + "x"  # tamper the suffix
-
-    client.cookies.set(SESSION_COOKIE_NAME, cookie)
+def test_invalid_supabase_jwt_falls_through_and_redirects(
+    client: TestClient, supabase_mock: MagicMock
+) -> None:
+    """sb-access-token present but Supabase returns no user → the
+    transitional shim falls through to the legacy path (no legacy
+    cookie either) → UnauthenticatedError → 303."""
+    supabase_mock.auth.get_user.return_value = SimpleNamespace(user=None)
+    client.cookies.set(SUPABASE_COOKIE, "expired-or-forged")
     response = client.get("/api/me", follow_redirects=False)
-
-    assert response.status_code == 303
-    assert response.headers["location"] == "/"
-
-
-def test_tampered_cookie_htmx_returns_hx_redirect(client: TestClient, session: Session) -> None:
-    user = _seed_user(session)
-    cookie = sign_session(user_id=user.id, secret=TEST_SECRET) + "x"
-
-    client.cookies.set(SESSION_COOKIE_NAME, cookie)
-    response = client.get("/api/me", headers={"HX-Request": "true"}, follow_redirects=False)
-
-    assert response.status_code == 200
-    assert response.headers.get("hx-redirect") == "/"
-
-
-def test_cookie_for_deleted_user_redirects(client: TestClient, session: Session) -> None:
-    """A cookie that's cryptographically valid but references a user_id
-    that no longer exists in the DB must be treated as unauthenticated.
-    Same outcome as forged or expired — preserves the "we don't reveal
-    why" invariant.
-    """
-    cookie = sign_session(user_id=uuid.uuid4(), secret=TEST_SECRET)
-
-    client.cookies.set(SESSION_COOKIE_NAME, cookie)
-    response = client.get("/api/me", follow_redirects=False)
-
-    assert response.status_code == 303
-    assert response.headers["location"] == "/"
-
-
-def test_cookie_with_signed_secret_mismatch_redirects(client: TestClient) -> None:
-    """A cookie signed with a different secret (e.g., from a previous
-    SESSION_SECRET rotation) must not authenticate."""
-    cookie = sign_session(user_id=uuid.uuid4(), secret="some-other-secret")
-
-    client.cookies.set(SESSION_COOKIE_NAME, cookie)
-    response = client.get("/api/me", follow_redirects=False)
-
     assert response.status_code == 303
 
 
-# ---------------------------------------------------------------------------
-# Rolling re-issue
-# ---------------------------------------------------------------------------
-
-
-def test_old_cookie_triggers_reissue(client: TestClient, session: Session) -> None:
-    user = _seed_user(session)
-    eight_days_ago = datetime.now(UTC) - timedelta(days=8)
-    old_cookie = _craft_cookie_with_issued_at(user_id=user.id, issued_at=eight_days_ago)
-
-    client.cookies.set(SESSION_COOKIE_NAME, old_cookie)
+def test_supabase_raises_falls_through_and_redirects(
+    client: TestClient, supabase_mock: MagicMock
+) -> None:
+    """If supabase-py raises, treat as unauthenticated (don't surface
+    a 500 — the user just gets bounced to the landing page)."""
+    supabase_mock.auth.get_user.side_effect = RuntimeError("network")
+    client.cookies.set(SUPABASE_COOKIE, "garbage")
     response = client.get("/api/me", follow_redirects=False)
-
-    assert response.status_code == 200
-
-    # A new Set-Cookie header must be present (the rolling re-issue).
-    set_cookie = response.headers.get("set-cookie", "")
-    assert SESSION_COOKIE_NAME in set_cookie
-    assert "HttpOnly" in set_cookie
-    assert "Max-Age=2592000" in set_cookie
-
-
-def test_fresh_cookie_does_not_trigger_reissue(client: TestClient, session: Session) -> None:
-    """A cookie issued less than 7 days ago is accepted with no re-issue.
-    This pins the threshold so a future tweak to SESSION_REISSUE_AFTER_DAYS
-    can't silently re-issue on every request (which would be a perf and
-    cookie-churn cost).
-    """
-    user = _seed_user(session)
-    one_day_ago = datetime.now(UTC) - timedelta(days=1)
-    fresh_cookie = _craft_cookie_with_issued_at(user_id=user.id, issued_at=one_day_ago)
-
-    client.cookies.set(SESSION_COOKIE_NAME, fresh_cookie)
-    response = client.get("/api/me", follow_redirects=False)
-
-    assert response.status_code == 200
-    # No Set-Cookie header; browser keeps using the cookie it sent.
-    assert "set-cookie" not in {k.lower() for k in response.headers}
-
-
-# ---------------------------------------------------------------------------
-# Malformed payloads
-# ---------------------------------------------------------------------------
-
-
-def test_cookie_with_malformed_user_id_redirects(client: TestClient) -> None:
-    """Cookie payload whose user_id is not a valid UUID string must
-    redirect, not 500. Defensive: itsdangerous JSON decodes anything,
-    so we rely on uuid.UUID(...) raising ValueError on garbage."""
-    payload = {"user_id": "not-a-uuid", "issued_at": datetime.now(UTC).isoformat()}
-    cookie = _serializer(TEST_SECRET).dumps(payload)
-
-    client.cookies.set(SESSION_COOKIE_NAME, cookie)
-    response = client.get("/api/me", follow_redirects=False)
-
-    assert response.status_code == 303
-
-
-def test_cookie_with_missing_user_id_redirects(client: TestClient) -> None:
-    payload = {"issued_at": datetime.now(UTC).isoformat()}
-    cookie = _serializer(TEST_SECRET).dumps(payload)
-
-    client.cookies.set(SESSION_COOKIE_NAME, cookie)
-    response = client.get("/api/me", follow_redirects=False)
-
     assert response.status_code == 303

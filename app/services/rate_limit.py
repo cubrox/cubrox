@@ -220,29 +220,13 @@ async def enforce_login_rate_limit(
     )
 
 
-def enforce_verify_rate_limit(
-    request: Request,
-    session: SessionDep,
-    token: str = "",
-) -> None:
-    """FastAPI dependency for GET /auth/verify.
-
-    Secondary key uses the SHA-256 prefix of the token rather than the
-    raw token so the rate_bucket table never stores token material.
-    """
-    ip = _client_ip(request)
-    if not token:
-        # No token in the URL — the verify route will 410. Don't burn
-        # a bucket entry on a malformed request.
-        return
-    token_prefix = hashlib.sha256(token.encode("utf-8")).hexdigest()[:8]
-
-    _enforce(
-        session,
-        keys=(f"verify:ip:{ip}", f"verify:token-prefix:{token_prefix}"),
-        route="verify",
-        email_hash=None,
-    )
+# Note: the pre-SUPA-3 `enforce_verify_rate_limit` was deleted in
+# SUPA-5 (#84) along with the /auth/verify route it gated. Rate
+# limiting for the new /auth/callback hand-off is handled by Supabase
+# Auth's built-in token-issuance limits — our own callback handler is
+# cheap (one supabase.auth.get_user call + a cookie set), and a
+# stolen access token already proves the holder cleared Supabase's
+# own gate.
 
 
 # Convenience type aliases — useful only for tests / introspection.

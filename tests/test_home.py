@@ -12,30 +12,10 @@ anonymous path; the dedicated `test_signed_in_visitor_redirects_to_passages_new`
 test exercises the signed-in branch.
 """
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.models.user import User
-from app.services.identity import magic_link
-from app.services.identity.session import SESSION_COOKIE_NAME, sign_session
-
-TEST_SECRET = "dev-only"
-
-
-@pytest.fixture(autouse=True)
-def stub_email_sender(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Replace the real Resend dispatch with a no-op.
-
-    The signin-form-submits-to-/login test exercises the real /login
-    route, which would otherwise call Resend with the (unset) test
-    API key. Stub it out the same way test_auth_login.py does.
-    """
-    monkeypatch.setattr(
-        magic_link,
-        "send_magic_link_email",
-        lambda **_: None,
-    )
+from tests.conftest import signed_in
 
 
 def test_landing_page_returns_200_and_html(client: TestClient) -> None:
@@ -58,15 +38,11 @@ def test_signed_in_visitor_redirects_to_passages_new(
     client: TestClient,
     session: Session,
 ) -> None:
-    """Per BUG-2 (#51): a visitor with a valid session cookie should
-    skip the landing page and land directly on the paste/upload entry
-    point. Without this, returning users clicking bookmarked `/` see
-    the sign-in form and assume the site is broken."""
-    user = User(email="returning@example.com")
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    client.cookies.set(SESSION_COOKIE_NAME, sign_session(user_id=user.id, secret=TEST_SECRET))
+    """Per BUG-2 (#51): a signed-in visitor should skip the landing page
+    and land directly on the paste/upload entry point. Without this,
+    returning users clicking bookmarked `/` see the sign-in form and
+    assume the site is broken."""
+    signed_in(session, email="returning@example.com")
 
     response = client.get("/", follow_redirects=False)
     assert response.status_code == 303
@@ -75,15 +51,12 @@ def test_signed_in_visitor_redirects_to_passages_new(
     assert "<form" not in response.text
 
 
-def test_invalid_cookie_falls_back_to_landing_page(
+def test_unauthenticated_visitor_sees_signin_form(
     client: TestClient,
 ) -> None:
-    """A session cookie that doesn't verify (forged, expired, signed
-    with the wrong secret) should be treated as no-cookie — render
-    the sign-in form rather than 4xx the visitor. The soft-auth
-    `try_current_user` dep returns None for any verify failure."""
-    client.cookies.set(SESSION_COOKIE_NAME, "this-is-not-a-valid-cookie")
-
+    """An anonymous visitor (no auth) sees the sign-in form, not a 4xx.
+    The soft-auth `try_current_user` dep returns None for any verify
+    failure, and the landing page renders the form for None users."""
     response = client.get("/", follow_redirects=False)
     assert response.status_code == 200
     # Sign-in form rendered; no redirect.
@@ -163,9 +136,8 @@ def test_signin_form_submission_returns_check_inbox_fragment(
     client: TestClient,
 ) -> None:
     """End-to-end smoke: posting the form's value to /login returns the
-    success fragment from AUTH-1. This pins the template-route contract
-    (the form's action target must match the route's expected method
-    and field name)."""
+    success fragment. The conftest's autouse Supabase stub makes
+    sign_in_with_otp a no-op so this doesn't hit the network."""
     response = client.post(
         "/login",
         data={"email": "reader@example.com"},

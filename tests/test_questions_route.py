@@ -26,12 +26,9 @@ from sqlmodel import Session
 
 from app.main import app
 from app.models.passage import Passage
-from app.models.user import User
 from app.services.comprehension import generator
 from app.services.comprehension.client import get_anthropic_client
-from app.services.identity.session import SESSION_COOKIE_NAME, sign_session
-
-TEST_SECRET = "dev-only"
+from tests.conftest import make_user, signed_in
 
 
 @pytest.fixture(autouse=True)
@@ -46,15 +43,6 @@ def stub_anthropic_client() -> Any:
     app.dependency_overrides[get_anthropic_client] = lambda: mock_client
     yield mock_client
     app.dependency_overrides.pop(get_anthropic_client, None)
-
-
-def _signed_in(client: TestClient, session: Session, email: str = "reader@example.com") -> User:
-    user = User(email=email)
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    client.cookies.set(SESSION_COOKIE_NAME, sign_session(user_id=user.id, secret=TEST_SECRET))
-    return user
 
 
 def _make_passage(
@@ -83,7 +71,7 @@ def test_owner_gets_questions_fragment(
     session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     monkeypatch.setattr(
@@ -110,7 +98,7 @@ def test_response_is_a_fragment_not_a_full_page(
     session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     monkeypatch.setattr(
@@ -132,7 +120,7 @@ def test_route_passes_passage_text_and_question_type_to_generator(
     """Pin the contract between the route and generate_questions.
     The route must pass the loaded passage's text AND
     question_type='recall'."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id, text="O Son of Spirit!")
 
     captured: dict[str, Any] = {}
@@ -154,7 +142,7 @@ def test_route_uses_configured_model_id(
     session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     captured_model: dict[str, str] = {}
@@ -176,12 +164,9 @@ def test_route_uses_configured_model_id(
 
 
 def test_other_users_passage_returns_404(client: TestClient, session: Session) -> None:
-    me = _signed_in(client, session, email="me@example.com")  # noqa: F841
+    me = signed_in(session, email="me@example.com")  # noqa: F841
 
-    other_user = User(email="other@example.com")
-    session.add(other_user)
-    session.commit()
-    session.refresh(other_user)
+    other_user = make_user(session, email="other@example.com")
     other_passage = _make_passage(session, other_user.id)
 
     response = client.get(f"/passages/{other_passage.id}/questions")
@@ -189,7 +174,7 @@ def test_other_users_passage_returns_404(client: TestClient, session: Session) -
 
 
 def test_nonexistent_passage_returns_404(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     response = client.get(f"/passages/{uuid.uuid4()}/questions")
     assert response.status_code == 404
 
@@ -199,11 +184,8 @@ def test_other_user_and_nonexistent_have_identical_response_shape(
 ) -> None:
     """Single failure branch → same 404 body for both. Don't leak which
     case applied."""
-    _signed_in(client, session)
-    other = User(email="other@example.com")
-    session.add(other)
-    session.commit()
-    session.refresh(other)
+    signed_in(session)
+    other = make_user(session, email="other@example.com")
     other_passage = _make_passage(session, other.id)
 
     other_response = client.get(f"/passages/{other_passage.id}/questions")
@@ -225,7 +207,7 @@ def test_passage_too_long_returns_200_with_friendly_fragment(
     """A PassageTooLongError from the generator must render as a friendly
     200 fragment, NOT a 4xx/5xx. Comprehension is a feature, not a hard
     dependency on every passage."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     def fake_generate(**_: Any) -> list[dict]:
@@ -255,7 +237,7 @@ def test_generator_error_returns_200_with_unavailable_fragment(
     pytest's caplog — caplog interactions are sensitive to suite-wide
     logging configuration that other tests can perturb. Patching the
     bound method is robust to anything else the suite has done."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     def fake_generate(**_: Any) -> list[dict]:
@@ -285,7 +267,7 @@ def test_generator_error_log_does_not_include_passage_text(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     sensitive = "SENSITIVE_MARKER_DO_NOT_LOG"
     passage = _make_passage(session, user.id, text=f"{sensitive} something something")
 
@@ -334,7 +316,7 @@ def test_reading_view_contains_questions_placeholder(client: TestClient, session
     """READ-1's reading page now includes a <div id="questions-panel">
     that lazy-loads from this route. Pin the wiring so a future template
     refactor that removes it can't slip through."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")
@@ -349,7 +331,7 @@ def test_reading_view_contains_questions_placeholder(client: TestClient, session
 def test_reading_view_placeholder_has_aria_live(client: TestClient, session: Session) -> None:
     """The placeholder div needs aria-live so screen readers announce
     the lazy-loaded content when it arrives."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")

@@ -22,12 +22,8 @@ from sqlmodel import Session
 
 from app.models.passage import Passage
 from app.models.preference import Preference
-from app.models.user import User
-from app.services.identity.session import SESSION_COOKIE_NAME, sign_session
 from app.services.reading.bionic import MAX_BOLD_CHARS, MIN_WORD_LEN, bionicize
-
-TEST_SECRET = "dev-only"
-
+from tests.conftest import signed_in
 
 # ---------------------------------------------------------------------------
 # Unit tests on bionicize() directly
@@ -206,15 +202,6 @@ def test_amp_in_user_text_is_escaped() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _signed_in(client: TestClient, session: Session) -> User:
-    user = User(email="reader@example.com")
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    client.cookies.set(SESSION_COOKIE_NAME, sign_session(user_id=user.id, secret=TEST_SECRET))
-    return user
-
-
 def _make_passage(session: Session, user_id: uuid.UUID, text: str) -> Passage:
     p = Passage(
         user_id=user_id,
@@ -233,7 +220,7 @@ def test_reading_view_does_not_bionicize_when_disabled(
     client: TestClient, session: Session
 ) -> None:
     """Default is bionic_enabled=False; reading view shows raw text."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id, "understanding the natural world")
 
     response = client.get(f"/read/{passage.id}")
@@ -252,7 +239,7 @@ def test_reading_view_does_not_bionicize_when_disabled(
 
 def test_reading_view_bionicizes_when_enabled(client: TestClient, session: Session) -> None:
     """User with bionic_enabled=True gets the article's text bionicized."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id, "understanding the natural world")
 
     session.add(
@@ -285,7 +272,7 @@ def test_reading_view_with_bionic_does_not_render_user_html_as_tags(
     """End-to-end XSS check: with bionic enabled, a passage containing
     `<script>` is still rendered as escaped text. The bionic transform
     never bypasses Jinja's auto-escape for user content."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id, "<script>alert(1)</script>")
 
     session.add(

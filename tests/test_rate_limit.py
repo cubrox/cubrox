@@ -16,13 +16,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.services import rate_limit
-from app.services.identity import magic_link
 
-
-@pytest.fixture(autouse=True)
-def stub_email_sender(monkeypatch: pytest.MonkeyPatch) -> None:
-    """/login dispatches an email on the happy path; mute that side effect."""
-    monkeypatch.setattr(magic_link, "send_magic_link_email", lambda **_: None)
+# /login's email-side-effect mute used to live here as a Resend
+# monkeypatch. After SUPA-3 (#82), /login goes through Supabase Auth,
+# which conftest's autouse `_autouse_supabase_stub` already replaces
+# with a MagicMock — so no per-file stub is needed.
 
 
 @pytest.fixture
@@ -209,35 +207,6 @@ def test_rate_limit_log_hashes_the_email(
     assert any(expected_prefix in ((msg % args) if args else msg) for msg, args in warn_calls)
 
 
-# ---------------------------------------------------------------------------
-# /auth/verify — bucketed by IP and token-prefix
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skip(reason="SUPA-3: /auth/verify route deleted; rewrite for /auth/callback in SUPA-5")
-def test_verify_route_rate_limits_by_ip(
-    client: TestClient, fake_clock: dict[str, datetime]
-) -> None:
-    """Hammering /auth/verify with different tokens from one IP still
-    burns the IP bucket. The 11th request 429s even though every token
-    so far has been distinct (so the per-token-prefix buckets are
-    fresh)."""
-    for i in range(10):
-        response = client.get(
-            "/auth/verify",
-            params={"token": f"token-{i:02d}-abcdef"},
-            headers={"X-Forwarded-For": "10.0.0.1, 203.0.113.9"},
-            follow_redirects=False,
-        )
-        # Token is fake → expect 410, NOT 429. The point is the bucket
-        # decremented.
-        assert response.status_code == 410, f"request {i + 1}: got {response.status_code}"
-
-    response = client.get(
-        "/auth/verify",
-        params={"token": "token-99-abcdef"},
-        headers={"X-Forwarded-For": "10.0.0.1, 203.0.113.9"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 429
-    assert int(response.headers["retry-after"]) >= 1
+# /auth/verify rate-limit tests were deleted in SUPA-5 (#84): the
+# route itself was deleted in SUPA-3 (#82) and the new /auth/callback
+# delegates rate limiting to Supabase's own token-issuance limits.

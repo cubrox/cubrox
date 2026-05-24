@@ -21,11 +21,8 @@ from sqlmodel import Session
 
 from app.models.passage import Passage
 from app.models.preference import Preference
-from app.models.user import User
-from app.services.identity.session import SESSION_COOKIE_NAME, sign_session
 from app.services.reading.defaults import DEFAULT_PREFERENCES
-
-TEST_SECRET = "dev-only"
+from tests.conftest import make_user, signed_in
 
 ALL_CSS_VAR_NAMES = (
     "--reader-font",
@@ -35,15 +32,6 @@ ALL_CSS_VAR_NAMES = (
     "--reader-fg",
     "--reader-max-width",
 )
-
-
-def _signed_in(client: TestClient, session: Session, email: str = "reader@example.com") -> User:
-    user = User(email=email)
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    client.cookies.set(SESSION_COOKIE_NAME, sign_session(user_id=user.id, secret=TEST_SECRET))
-    return user
 
 
 def _make_passage(session: Session, user_id: uuid.UUID, text: str = "The hidden words.") -> Passage:
@@ -66,7 +54,7 @@ def _make_passage(session: Session, user_id: uuid.UUID, text: str = "The hidden 
 
 
 def test_owner_gets_passage_rendered(client: TestClient, session: Session) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id, text="O Son of Spirit! My first counsel is this...")
 
     response = client.get(f"/read/{passage.id}")
@@ -80,7 +68,7 @@ def test_response_is_a_full_html_page_not_a_fragment(client: TestClient, session
     """The reading view is a top-level browser navigation. It must be
     a full page (with <html>), not an HTMX fragment. Pin this so a
     future refactor can't accidentally turn it into a fragment route."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")
@@ -90,7 +78,7 @@ def test_response_is_a_full_html_page_not_a_fragment(client: TestClient, session
 def test_response_contains_style_block_with_all_six_css_variables(
     client: TestClient, session: Session
 ) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")
@@ -104,7 +92,7 @@ def test_response_contains_style_block_with_all_six_css_variables(
 def test_passage_renders_inside_reading_surface_article(
     client: TestClient, session: Session
 ) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id, text="some passage text")
 
     response = client.get(f"/read/{passage.id}")
@@ -124,7 +112,7 @@ def test_passage_renders_inside_reading_surface_article(
 def test_user_with_no_preference_row_gets_defaults_rendered(
     client: TestClient, session: Session
 ) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")
@@ -145,7 +133,7 @@ def test_user_with_preference_row_gets_their_values_rendered(
     unmistakable size value and asserting it lands in the rendered
     style block.
     """
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     session.add(
@@ -174,7 +162,7 @@ def test_does_not_create_preference_row_on_first_render(
     lazily inserted. Row creation is gated to actual user toggles
     (READ-2 #16). This pins the lazy-NOT-eager invariant.
     """
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     client.get(f"/read/{passage.id}")
@@ -191,12 +179,9 @@ def test_does_not_create_preference_row_on_first_render(
 def test_other_users_passage_returns_404(client: TestClient, session: Session) -> None:
     """A passage owned by someone else returns 404 — same as
     nonexistent. Don't leak existence."""
-    me = _signed_in(client, session, email="me@example.com")  # noqa: F841
+    me = signed_in(session, email="me@example.com")  # noqa: F841
 
-    other_user = User(email="other@example.com")
-    session.add(other_user)
-    session.commit()
-    session.refresh(other_user)
+    other_user = make_user(session, email="other@example.com")
     other_passage = _make_passage(session, other_user.id, text="not yours")
 
     response = client.get(f"/read/{other_passage.id}")
@@ -204,7 +189,7 @@ def test_other_users_passage_returns_404(client: TestClient, session: Session) -
 
 
 def test_nonexistent_uuid_returns_404(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     response = client.get(f"/read/{uuid.uuid4()}")
     assert response.status_code == 404
 
@@ -216,12 +201,9 @@ def test_other_user_and_nonexistent_have_identical_response_shape(
     nothing distinguishing them. Pin this so a future refactor can't
     introduce a more-helpful error message that gives away whether a
     UUID is real."""
-    _signed_in(client, session)
+    signed_in(session)
 
-    other = User(email="other@example.com")
-    session.add(other)
-    session.commit()
-    session.refresh(other)
+    other = make_user(session, email="other@example.com")
     other_passage = _make_passage(session, other.id)
 
     other_response = client.get(f"/read/{other_passage.id}")
@@ -246,6 +228,6 @@ def test_invalid_uuid_returns_422(client: TestClient, session: Session) -> None:
     surfaced through our 404 path. This is fine — there's no way to
     confuse 'not a UUID' with a real passage that exists or doesn't.
     """
-    _signed_in(client, session)
+    signed_in(session)
     response = client.get("/read/not-a-uuid")
     assert response.status_code == 422

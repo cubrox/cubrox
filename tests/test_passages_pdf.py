@@ -20,10 +20,8 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.models.passage import Passage
-from app.models.user import User
-from app.services.identity.session import SESSION_COOKIE_NAME, sign_session
+from tests.conftest import signed_in
 
-TEST_SECRET = "dev-only"
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "sample_passage.pdf"
 
 # A valid PDF with no text content (one empty page). Used to exercise
@@ -59,13 +57,6 @@ BLANK_PDF_BYTES = base64.b64decode(
 )
 
 
-def _signed_in(client: TestClient, session: Session, email: str = "reader@example.com") -> User:
-    user = User(email=email)
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    client.cookies.set(SESSION_COOKIE_NAME, sign_session(user_id=user.id, secret=TEST_SECRET))
-    return user
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +65,7 @@ def _signed_in(client: TestClient, session: Session, email: str = "reader@exampl
 
 
 def test_upload_pdf_redirects_to_read_route(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     with FIXTURE_PDF.open("rb") as f:
         response = client.post(
             "/passages/pdf",
@@ -89,7 +80,7 @@ def test_upload_pdf_redirects_to_read_route(client: TestClient, session: Session
 
 
 def test_uploaded_pdf_persists_extracted_text(client: TestClient, session: Session) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     with FIXTURE_PDF.open("rb") as f:
         client.post(
             "/passages/pdf",
@@ -120,7 +111,7 @@ def test_upload_over_25mb_returns_413(client: TestClient, session: Session) -> N
     We don't need real PDF content here — the Content-Length header
     triggers the 413 before pdfplumber is even invoked.
     """
-    _signed_in(client, session)
+    signed_in(session)
     oversize = b"\x00" * (26 * 1024 * 1024)  # 26 MB
     response = client.post(
         "/passages/pdf",
@@ -131,7 +122,7 @@ def test_upload_over_25mb_returns_413(client: TestClient, session: Session) -> N
 
 
 def test_upload_wrong_content_type_returns_415(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     response = client.post(
         "/passages/pdf",
         files={"file": ("notes.txt", io.BytesIO(b"just text, not a PDF"), "text/plain")},
@@ -145,7 +136,7 @@ def test_blank_pdf_returns_422_with_user_readable_message(
 ) -> None:
     """Per PRD Risk #3, a blank or scanned-only PDF must surface a
     helpful message rather than a silent success or a 500."""
-    _signed_in(client, session)
+    signed_in(session)
     response = client.post(
         "/passages/pdf",
         files={"file": ("blank.pdf", io.BytesIO(BLANK_PDF_BYTES), "application/pdf")},
@@ -162,7 +153,7 @@ def test_corrupt_pdf_returns_422_with_user_readable_message(
     """A file that's labeled application/pdf but isn't actually a PDF
     should not bubble a 500 to the user — it should land on the same
     user-readable 422 as the blank-PDF path."""
-    _signed_in(client, session)
+    signed_in(session)
     response = client.post(
         "/passages/pdf",
         files={"file": ("garbage.pdf", io.BytesIO(b"not a real pdf"), "application/pdf")},

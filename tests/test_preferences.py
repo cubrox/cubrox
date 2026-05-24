@@ -22,19 +22,7 @@ from sqlmodel import Session
 
 from app.models.passage import Passage
 from app.models.preference import Preference
-from app.models.user import User
-from app.services.identity.session import SESSION_COOKIE_NAME, sign_session
-
-TEST_SECRET = "dev-only"
-
-
-def _signed_in(client: TestClient, session: Session, email: str = "reader@example.com") -> User:
-    user = User(email=email)
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    client.cookies.set(SESSION_COOKIE_NAME, sign_session(user_id=user.id, secret=TEST_SECRET))
-    return user
+from tests.conftest import signed_in
 
 
 def _make_passage(session: Session, user_id: uuid.UUID) -> Passage:
@@ -60,7 +48,7 @@ def _make_passage(session: Session, user_id: uuid.UUID) -> Passage:
 def test_post_preference_returns_style_fragment_with_new_value(
     client: TestClient, session: Session
 ) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
     response = client.post("/preferences/size", data={"value": "20px"})
 
     assert response.status_code == 200
@@ -77,7 +65,7 @@ def test_post_preference_returns_style_fragment_with_new_value(
 def test_response_is_a_fragment_not_a_full_page(client: TestClient, session: Session) -> None:
     """The route is HTMX-only — must return a fragment so HTMX can swap
     just the <style> block without replacing the whole document."""
-    _signed_in(client, session)
+    signed_in(session)
     response = client.post("/preferences/size", data={"value": "24px"})
 
     body = response.text
@@ -86,7 +74,7 @@ def test_response_is_a_fragment_not_a_full_page(client: TestClient, session: Ses
 
 
 def test_response_content_type_is_html(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     response = client.post("/preferences/size", data={"value": "16px"})
     assert response.headers["content-type"].startswith("text/html")
 
@@ -99,7 +87,7 @@ def test_response_content_type_is_html(client: TestClient, session: Session) -> 
 def test_second_toggle_merges_into_existing_values(client: TestClient, session: Session) -> None:
     """Setting `size` then `line_height` should produce a row with BOTH
     keys set. The second toggle must NOT overwrite the whole blob."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
 
     client.post("/preferences/size", data={"value": "24px"})
     client.post("/preferences/line_height", data={"value": "1.8"})
@@ -112,7 +100,7 @@ def test_second_toggle_merges_into_existing_values(client: TestClient, session: 
 
 
 def test_third_toggle_updates_only_its_own_key(client: TestClient, session: Session) -> None:
-    user = _signed_in(client, session)
+    user = signed_in(session)
 
     client.post("/preferences/size", data={"value": "20px"})
     client.post("/preferences/max_width", data={"value": "75ch"})
@@ -132,7 +120,7 @@ def test_third_toggle_updates_only_its_own_key(client: TestClient, session: Sess
 
 
 def test_unknown_preference_key_returns_422(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     response = client.post("/preferences/totally_made_up_key", data={"value": "anything"})
     assert response.status_code == 422
 
@@ -141,7 +129,7 @@ def test_value_outside_allow_list_returns_422(client: TestClient, session: Sessi
     """The architecture's dependent-invariant: any user-supplied value
     must be in the per-key allow-list. A value outside the list is
     rejected at 422 — never reaches the rendered <style> block."""
-    _signed_in(client, session)
+    signed_in(session)
     # 999px is not in the size allow-list.
     response = client.post("/preferences/size", data={"value": "999px"})
     assert response.status_code == 422
@@ -150,7 +138,7 @@ def test_value_outside_allow_list_returns_422(client: TestClient, session: Sessi
 def test_css_injection_attempt_returns_422(client: TestClient, session: Session) -> None:
     """Adversarial input: a string that LOOKS like CSS but contains
     a payload. Must be rejected because it's not in the allow-list."""
-    _signed_in(client, session)
+    signed_in(session)
     payload = "red;}body{display:none;}"
     response = client.post("/preferences/bg", data={"value": payload})
     assert response.status_code == 422
@@ -161,7 +149,7 @@ def test_bionic_enabled_accepts_true_and_false_strings(
 ) -> None:
     """Form values come in as strings. The 'bionic_enabled' key needs
     'true'/'false' coerced to actual booleans before allow-list check."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
 
     response_on = client.post("/preferences/bionic_enabled", data={"value": "true"})
     assert response_on.status_code == 200
@@ -181,7 +169,7 @@ def test_bionic_enabled_accepts_true_and_false_strings(
 
 
 def test_bionic_enabled_rejects_non_boolean_strings(client: TestClient, session: Session) -> None:
-    _signed_in(client, session)
+    signed_in(session)
     response = client.post("/preferences/bionic_enabled", data={"value": "yes"})
     assert response.status_code == 422
 
@@ -207,7 +195,7 @@ def test_unchanged_value_does_not_update_updated_at(client: TestClient, session:
     second post — the helper short-circuits when the new value equals
     the current value. Pin this so a future refactor that always-writes
     can't slip through and silently 2x our DB write traffic."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
 
     client.post("/preferences/size", data={"value": "20px"})
     session.expire_all()
@@ -222,7 +210,7 @@ def test_unchanged_value_does_not_update_updated_at(client: TestClient, session:
 
 def test_changed_value_does_update_updated_at(client: TestClient, session: Session) -> None:
     """Inverse of above: an actual change DOES bump updated_at."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
 
     client.post("/preferences/size", data={"value": "20px"})
     session.expire_all()
@@ -246,7 +234,7 @@ def test_sidebar_renders_with_aria_pressed_for_active_default(
     """A user with no Preference row gets defaults; the buttons matching
     those defaults have aria-pressed='true'. Pinned by checking the
     default size value '18px' button."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")
@@ -265,7 +253,7 @@ def test_sidebar_renders_button_for_each_allow_listed_value(
 ) -> None:
     """Every allow-listed value gets a button. Pin this by checking a
     sample of values are present in the rendered HTML."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")
@@ -285,7 +273,7 @@ def test_sidebar_renders_button_for_each_allow_listed_value(
 def test_sidebar_buttons_target_the_style_block(client: TestClient, session: Session) -> None:
     """The HTMX swap target must be #reading-surface-style — that's the
     contract READ-1 set up. Without this, the swap silently misses."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")
@@ -299,7 +287,7 @@ def test_sidebar_uses_button_not_div_for_controls(client: TestClient, session: S
     """Accessibility: toggle controls must be <button>, not <div>.
     Without this, keyboard users can't reach them and screen readers
     don't announce them as interactive."""
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")
@@ -329,7 +317,7 @@ def test_bionic_buttons_render_lowercase_booleans_and_route_accepts_them(
     back to `| string` fails (a); a future route change that requires
     capitalized booleans fails (b).
     """
-    user = _signed_in(client, session)
+    user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")

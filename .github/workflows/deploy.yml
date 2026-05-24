@@ -78,28 +78,10 @@ jobs:
         if: steps.check_secrets.outputs.skip != 'true'
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
-      # Set up uv and Python so we can run Alembic migrations against the
-      # production Neon database before the new revision takes traffic.
-      # This ensures the new image never talks to an outdated schema.
-      - name: Install uv
-        if: steps.check_secrets.outputs.skip != 'true'
-        uses: astral-sh/setup-uv@v5
-        with:
-          version: "0.5.x"
-
-      - name: Run Alembic migrations
-        if: steps.check_secrets.outputs.skip != 'true'
-        env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
-        run: |
-          if [ -z "$DATABASE_URL" ]; then
-            echo "PRODUCTION_DATABASE_URL not configured — skipping migrations."
-            echo "Set this secret to the Neon main branch pooled URL if you want"
-            echo "the workflow to run migrations before each deploy."
-            exit 0
-          fi
-          uv sync --frozen
-          uv run alembic upgrade head
+      # Schema migrations now run via the Supabase GitHub App
+      # auto-branching integration (per SUPA-1 / #80). No
+      # workflow-driven migration step needed; the alembic chain was
+      # deleted in SUPA-2b / #87.
 
       - name: Build and push container
         if: steps.check_secrets.outputs.skip != 'true'

@@ -34,7 +34,7 @@ def get_session() -> Generator[Session, None, None]:
 def create_db_and_tables() -> None:
     """Create all tables. Used for tests and local dev.
 
-    In production, Alembic migrations are the source of truth — do NOT
-    call this on startup. See alembic/versions/ for schema changes.
+    In production, Supabase CLI migrations (`supabase/migrations/*.sql`)
+    are the source of truth — do NOT call this on startup.
     """
     SQLModel.metadata.create_all(engine)

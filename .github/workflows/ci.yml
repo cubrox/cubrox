@@ -249,17 +249,23 @@ jobs:
 
       - name: Start local Supabase stack
         # `supabase status -o json` returns the freshly-generated keys
-        # for the local stack; we export them to GITHUB_ENV so the
-        # Playwright step (and the uvicorn subprocess it spawns) can
-        # read them via SUPABASE_URL / SUPABASE_ANON_KEY /
-        # SUPABASE_SERVICE_KEY without hard-coding the local-default
-        # JWTs (which can drift across CLI versions).
+        # + DB URL for the local stack; we export them to GITHUB_ENV
+        # so the Playwright step (and the uvicorn subprocess it spawns)
+        # can read them without hard-coding values (the local-default
+        # JWTs drift across CLI versions).
+        #
+        # DATABASE_URL points at the local Supabase Postgres so the
+        # Passage / Preference INSERTs land in the same DB the migrations
+        # already populated. Without this the subprocess falls back to
+        # `sqlite:///./dev.db` (the pydantic default) which has no
+        # schema applied — INSERTs fail with `no such table: passage`.
         run: |
           supabase start
           {
             echo "SUPABASE_URL=$(supabase status -o json | jq -r '.API_URL')"
             echo "SUPABASE_ANON_KEY=$(supabase status -o json | jq -r '.ANON_KEY')"
             echo "SUPABASE_SERVICE_KEY=$(supabase status -o json | jq -r '.SERVICE_ROLE_KEY')"
+            echo "DATABASE_URL=$(supabase status -o json | jq -r '.DB_URL')"
           } >> "$GITHUB_ENV"
 
       - name: Setup Node.js

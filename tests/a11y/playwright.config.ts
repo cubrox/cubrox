@@ -70,13 +70,20 @@ export default defineConfig({
       // cookies are verifiable. Config's _refuse_sqlite_outside_dev
       // gate trips on "dev-only" outside development/test envs.
       ENVIRONMENT: "test",
-      // Supabase backend the seed router talks to. In CI these are
-      // exported by the "Start local Supabase stack" step in ci.yml.
-      // In local dev the developer's .env file is read directly by
-      // pydantic-settings (see envIfSet doc above) — we only forward
-      // when actually present in process.env to avoid overriding .env
-      // with empty strings.
-      ...envIfSet("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY"),
+      // Supabase backend the seed router talks to + local DATABASE_URL
+      // (Postgres inside the local Supabase stack — has the migrated
+      // schema, so Passage / Preference INSERTs land in a real table).
+      // In CI all four are exported by the "Start local Supabase stack"
+      // step in ci.yml. In local dev the developer's .env file is read
+      // directly by pydantic-settings (see envIfSet doc above) — we
+      // only forward when actually present in process.env to avoid
+      // overriding .env with empty strings.
+      ...envIfSet(
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_KEY",
+        "DATABASE_URL",
+      ),
     },
   },
 });

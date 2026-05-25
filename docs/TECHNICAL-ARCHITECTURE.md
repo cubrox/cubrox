@@ -7,11 +7,12 @@ reading surface for neurodivergent readers, with Baha'i writings as its
 primary corpus. A single FastAPI process on Cloud Run serves Jinja2-rendered
 HTML; HTMX drives in-page interactivity (preference toggles, fragment swaps,
 deferred comprehension-question loading) without a JavaScript build step.
-State persists to Neon Postgres via SQLModel; per-PR Neon branches give
-every preview deploy an isolated database. Comprehension questions are
-generated on demand by Anthropic's Claude API and cached by passage hash.
-Authentication is passwordless via signed magic links delivered through
-Resend.
+State persists to Supabase Postgres via SQLModel; per-PR Supabase
+branches (Supabase GitHub App) give every preview deploy an isolated
+database. Comprehension questions are generated on demand by
+Anthropic's Claude API and cached by passage hash. Authentication is
+passwordless via Supabase Auth (GoTrue) magic links; the access token
+lives in an HttpOnly cookie.
 
 The design optimises for two product invariants: **WCAG conformance is a
 defining requirement, not a checkbox**, and **readability needs vary
@@ -63,13 +64,26 @@ the reader's profile.
 
 ### Authentication
 
-- **Passwordless magic link**, hand-rolled (~50 LOC)
-- Token: 32 bytes from `secrets.token_urlsafe`, stored as SHA-256 hash with
-  15-minute expiry. Single-use; one active token per email at a time.
-- Email transport: **Resend** (`resend` Python SDK)
-- Session: signed cookie via **`itsdangerous`** (`HttpOnly`, `Secure`,
-  `SameSite=Lax`, 30-day rolling)
-- Secrets: `RESEND_API_KEY`, `SESSION_SECRET` in Secret Manager
+- **Passwordless magic link via Supabase Auth (GoTrue)** (per ADR-006,
+  superseding ADR-002's hand-rolled approach)
+- Flow: POST `/login` → `supabase.auth.sign_in_with_otp(email, redirect_url)`
+  → Supabase mints + emails the link → GET `/auth/callback` two-stage
+  handler (JS bridge converts URL hash → query params per Pattern #35)
+  → `supabase.auth.get_user(access_token)` validates → `sb-access-token`
+  HttpOnly cookie set, 7-day max-age
+- Email transport: **Supabase's built-in SMTP** (no Resend dependency).
+  Custom SMTP configurable in Supabase Dashboard if rate limits bite.
+- Session: Supabase-issued JWT in HttpOnly cookie. No server-side
+  session table; no `itsdangerous` cookie signer.
+- Identity source: **`auth.users` in Supabase** (managed by GoTrue). The
+  local `User` SQLModel was deleted in SUPA-2c (#91). Routes that need
+  user identity get it from the Supabase user object via the
+  `current_user` dependency in `app/integrations/supabase/auth.py`.
+- Rate limiting: per-IP + per-email token buckets on POST `/login`
+  (existing `rate_bucket` table). Supabase's own rate limits sit
+  upstream of this.
+- Secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
+  in GCP Secret Manager (mounted as Cloud Run env vars).
 
 ### PDF ingestion
 
@@ -81,11 +95,23 @@ the reader's profile.
 
 ### Database
 
-- Primary: **Neon Postgres** (serverless, per-PR branching wired via
-  `preview-deploy.yml`)
+- Primary: **Supabase Postgres** (Pro plan, per-PR branching enabled via
+  the Supabase GitHub App). Project ref: `gnswmcgaztcxslirulwm`.
+- Schema source of truth: **Supabase CLI migrations** in
+  `supabase/migrations/*.sql` (replaces the deleted Alembic chain).
+- Row-Level Security on every public-schema table:
+  - Tenant-scoped tables (`passage`, `preference`, `reading_event`)
+    use `owner_id = auth.uid()` policies — anon key safe to use from
+    request handlers
+  - System / cross-user tables (`comprehension_question_cache`,
+    `rate_bucket`, `todo`) have RLS enabled with no
+    authenticated/anon policies — reachable only via the service-key
+    client in `app/integrations/supabase/client.py::service_client()`
+- App-table FKs point at `auth.users(id)` in the SQL migrations; the
+  SQLModel field declarations carry only the column type (no
+  `foreign_key="user.id"` since `auth.users` is in a different schema
+  and isn't a SQLModel-managed table).
 - No cache layer in MVP; Postgres handles preference + passage reads.
-  Reading-event writes are cheap (single INSERT). Reconsider Redis in
-  Phase 2 only if latency target (<100 ms) is missed.
 - No search engine in MVP. Add when curated-library work in Phase 3 lands.
 
 ### Infrastructure
@@ -96,7 +122,8 @@ the reader's profile.
 - Auth to GCP: **Workload Identity Federation** from GitHub Actions (SA key
   fallback for workshops only)
 - CI/CD: **GitHub Actions** — `ci.yml` (lint+test), `preview-deploy.yml`
-  (per-PR ephemeral env + Neon branch), `deploy.yml` (main → production)
+  (per-PR ephemeral Cloud Run revision; Supabase GitHub App
+  auto-creates per-PR Postgres branches), `deploy.yml` (main → production)
 - Observability: **Google Cloud Logging + Error Reporting** (zero-setup,
   auto-grouping of FastAPI tracebacks). Sentry deferred to Phase 2 if
   Cloud Logging proves insufficient.
@@ -128,18 +155,20 @@ the reader's profile.
               │  ┌───────────────────────┐  ┌────────────────┐ │
               │  │  SQLModel session     │  │ Anthropic SDK  │ │
               │  │  (psycopg pool)       │  │ (httpx-backed) │ │
+              │  │   supabase-py         │  │                │ │
               │  └───────────┬───────────┘  └────────┬───────┘ │
               └──────────────┼───────────────────────┼─────────┘
                              ▼                       ▼
-                  ┌──────────────────┐   ┌────────────────────┐
-                  │  Neon Postgres   │   │  Anthropic API     │
-                  │  user / pref /   │   │  Claude Haiku 4.5  │
-                  │  passage / event │   │  (prompt caching)  │
-                  └──────────────────┘   └────────────────────┘
-
-                             ┌──────────────────┐
-                             │  Resend (email)  │ ← magic-link delivery
-                             └──────────────────┘
+                  ┌────────────────────────┐   ┌────────────────────┐
+                  │  Supabase              │   │  Anthropic API     │
+                  │  - auth.users (GoTrue) │   │  Claude Haiku 4.5  │
+                  │  - passage / pref /    │   │  (prompt caching)  │
+                  │    reading_event       │   └────────────────────┘
+                  │  - RLS on every public │
+                  │    table              │
+                  │  - magic-link email    │
+                  │    delivery            │
+                  └────────────────────────┘
 ```
 
 ### Data Flow — typical reading session
@@ -283,9 +312,11 @@ CREATE TABLE reading_event (
 CREATE INDEX ON reading_event (occurred_at);
 ```
 
-`citext` and `gen_random_uuid()` ship with Neon; enable via Alembic
-migration that runs `CREATE EXTENSION IF NOT EXISTS citext;` and
-`CREATE EXTENSION IF NOT EXISTS pgcrypto;`.
+`gen_random_uuid()` is pre-installed on Supabase projects (pgcrypto
+extension is enabled by default). `citext` is no longer used — emails
+live in `auth.users` (Supabase-managed) rather than a local table.
+Extensions are declared in the Supabase SQL migration files
+(`supabase/migrations/*.sql`), not via Alembic.
 
 ## Development Standards
 
@@ -339,18 +370,24 @@ migration that runs `CREATE EXTENSION IF NOT EXISTS citext;` and
 
 ### Authentication
 
-- Passwordless magic link (15-minute TTL, single-use, hashed at rest).
-- Sessions: signed cookie via `itsdangerous`, `HttpOnly`, `Secure`,
-  `SameSite=Lax`. 30-day rolling re-issue.
-- Rate-limit `/login` and `/auth/verify` per IP and per email
-  (10/hour each) using a Postgres-backed token bucket. (Redis would be
-  better; add when traffic justifies it.)
+- Passwordless magic link delivered by Supabase Auth (GoTrue). Token
+  lifetime + single-use semantics are Supabase-managed.
+- Sessions: Supabase-issued JWT in an HttpOnly cookie
+  (`sb-access-token`, `Secure`, `SameSite=Lax`, 7-day max-age).
+- Rate-limit `POST /login` per IP and per email (10/hour each) using
+  a Postgres-backed token bucket. Supabase's own rate limits sit
+  upstream; ours is defense-in-depth against per-target abuse.
 
 ### Authorization
 
-- Single role: authenticated user. A user can only read/write their own
-  rows (enforced in route handlers via `WHERE user_id = current_user.id`).
-- No admin UI in MVP. Admin tasks happen via psql against the Neon branch.
+- Single role: authenticated user. Two enforcement layers:
+  1. Route handlers filter by `WHERE owner_id = current_user.id`
+  2. Supabase Row-Level Security on every public-schema table —
+     `owner_id = auth.uid()` for tenant-scoped tables; RLS enabled
+     with no anon/authenticated policies for service-role-only tables
+     (`comprehension_question_cache`, `rate_bucket`, `todo`)
+- No admin UI in MVP. Admin tasks happen via the Supabase Dashboard's
+  SQL editor or via the service-key client.
 
 ### Data Protection
 
@@ -379,7 +416,7 @@ migration that runs `CREATE EXTENSION IF NOT EXISTS citext;` and
 
 - Cloud Run scales horizontally on request concurrency (default 80
   concurrent requests per instance). Scale-to-zero when idle.
-- Neon's connection-pooled URL handles fan-out without exhausting the
+- Supabase's Supavisor pooler handles fan-out without exhausting the
   database.
 - Comprehension-question cache keeps LLM calls bounded by *distinct
   passages* read, not *re-reads*. Even at 10x the metric target, expected
@@ -413,7 +450,7 @@ migration that runs `CREATE EXTENSION IF NOT EXISTS citext;` and
 
 ### ADR-002: Passwordless magic-link authentication
 
-- Status: Accepted (2026-05-02)
+- Status: **Superseded by ADR-006 (2026-05-25)**
 - Context: Primary users are neurodivergent readers; password friction
   (remembering, typing, resetting) is exactly the kind of cognitive load
   the product is built to remove.
@@ -467,3 +504,41 @@ migration that runs `CREATE EXTENSION IF NOT EXISTS citext;` and
   client-side interactions (e.g., drag-to-reorder) require either light
   custom JS or graceful server round-trips. Acceptable for the MVP
   surface, which is fundamentally a read-and-toggle experience.
+
+### ADR-006: Supabase consolidation (Neon Postgres + Resend auth → Supabase)
+
+- Status: Accepted (2026-05-25)
+- Supersedes: ADR-002 (hand-rolled magic-link)
+- Context: Production was running two vendors' worth of complexity —
+  Neon for Postgres, Resend for the hand-rolled magic-link email — and
+  the Resend account hit the test-mode "sender must be account owner"
+  limit when a non-owner user tried to sign in (Cloud Run logs,
+  2026-05-23). The hand-rolled ADR-002 implementation made every auth
+  feature (rate limiting, token expiry, multi-device sessions) something
+  cubrox owned and had to maintain.
+- Decision: Consolidate persistence + auth on **Supabase** (Pro plan,
+  branching enabled). Replace Neon Postgres → Supabase Postgres
+  (`gnswmcgaztcxslirulwm`). Replace hand-rolled magic-link →
+  Supabase Auth (GoTrue magic-link via `supabase.auth.sign_in_with_otp`).
+  Replace `itsdangerous`-signed session cookie → Supabase JWT in
+  HttpOnly cookie. Replace Alembic schema management → Supabase CLI
+  migrations (`supabase/migrations/*.sql`).
+- Consequences:
+  - Drops two vendor dependencies (Neon, Resend) and three Python
+    packages (`resend`, `itsdangerous`, `alembic`) for one (`supabase`)
+  - Removes ~500 LOC of hand-rolled auth code, including the entire
+    `app/services/identity/` directory, `app/models/user.py`, and
+    `app/models/magic_link_token.py`
+  - Adds RLS as a defensive layer — every user-scoped public-schema
+    table enforces ownership at the database level, not just in route
+    code
+  - Single billing relationship (Supabase) instead of two (Neon +
+    Resend)
+  - Loses some control over the email template UX vs. the hand-rolled
+    Resend version (Supabase Auth's dashboard template editor is the
+    only knob); ADR-002's neurodivergent-UX argument still holds —
+    Supabase Auth's magic-link experience is equivalent
+  - Migration shipped across SUPA-1 through SUPA-6 (#80 through #85)
+    over ~3 days of agent work. Two follow-ups remain in the backlog:
+    a11y harness seed restoration (#97) and per-PR Supabase branch URL
+    injection (#99)

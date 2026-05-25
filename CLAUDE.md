@@ -163,17 +163,17 @@ Every agent output MUST follow these patterns. Full spec: `docs/AGENT-OUTPUT-STA
 - **License**: BSL 1.1 (converts to Apache 2.0 after 3 years per release)
 - **Project Name**: Cubrox
 - **Repository**: https://github.com/vibeacademy/cubrox
-- **Project Board**: https://github.com/users/cubrox/projects/1
+- **Project Board**: https://github.com/orgs/vibeacademy/projects/29
 - **Tech Stack**: FastAPI + Jinja2 + HTMX on Python 3.12
-- **Database layer**: SQLModel + Alembic
+- **Database layer**: SQLModel + Supabase CLI migrations (`supabase/migrations/*.sql`)
 - **Platform**: Google Cloud Platform (Cloud Run)
-- **Database**: Neon (serverless Postgres with per-PR branching)
+- **Database**: Supabase Postgres (Pro plan, branching enabled; project ref `gnswmcgaztcxslirulwm`)
+- **Auth**: Supabase Auth (GoTrue magic-link via `supabase-py`; JWT in HttpOnly cookie)
 - **Container Registry**: Artifact Registry
 - **Secrets**: Google Secret Manager
 - **Package manager**: uv
 - **Organization**: vibeacademy
 - **LLM**: Anthropic Claude API (`claude-haiku-4-5` for comprehension questions, with prompt caching + Postgres result cache)
-- **Email**: Resend (passwordless magic-link auth)
 - **PDF**: pdfplumber, in-process, ≤25 MB
 - **Observability**: Google Cloud Logging + Error Reporting
 - **Architecture doc**: `docs/TECHNICAL-ARCHITECTURE.md`
@@ -222,7 +222,7 @@ approved, tests passing, no lint errors, PR merged to main.
 | `docs/GETTING-STARTED.md` | First-time setup walkthrough |
 | `docs/FAQ.md` | Common questions for non-engineers |
 | `docs/TICKET-FORMAT.md` | Agentic PRD Lite ticket format (canonical) |
-| `docs/PATTERN-LIBRARY.md` | Known solutions for Cloud Run/Neon/GitHub silent failures |
+| `docs/PATTERN-LIBRARY.md` | Known solutions for Cloud Run/Supabase/GitHub silent failures |
 | `docs/ARTIFACT-FLOW.md` | Artifact flow diagrams and authority matrix |
 | `docs/AGENT-WORKFLOW-SUMMARY.md` | Complete workflow documentation |
 | `docs/MAINTENANCE.md` | Weekly audit and maintenance guide |

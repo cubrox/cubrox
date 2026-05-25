@@ -40,6 +40,7 @@
 17. [SQLModel: Small Connection Pool on Cloud Run](#17-sqlmodel-small-connection-pool-on-cloud-run)
 18. [HTMX: Return Fragments, Not Full Pages](#18-htmx-return-fragments-not-full-pages)
 19. [HTMX: hx-target and hx-swap Must Match Your Response Shape](#19-htmx-hx-target-and-hx-swap-must-match-your-response-shape)
+35. [Supabase: Hash-Fragment Callback Requires a Two-Stage Handler](#35-supabase-hash-fragment-callback-requires-a-two-stage-handler)
 
 ### GitHub Actions
 
@@ -1387,3 +1388,88 @@ https://docs.github.com/en/actions/security-for-github-actions/security-guides/a
 ("when you use the repository's `GITHUB_TOKEN` to perform tasks,
 events triggered by the `GITHUB_TOKEN` … will not create a new
 workflow run").
+
+## 35. Supabase: Hash-Fragment Callback Requires a Two-Stage Handler
+
+**Gotcha:** Supabase Auth's magic-link redirect puts the access token
+(and refresh token) in the URL **hash fragment** — e.g.
+`https://app.example.com/auth/callback#access_token=...&refresh_token=...`.
+Browsers do NOT send URL hash fragments to the server. So a naive
+single-route server handler reading query params sees an empty
+request and 404s/410s the user, while the JWT they need to sign in
+is sitting unused in their address bar.
+
+This is deliberate on Supabase's part — the hash keeps the token out
+of HTTP logs, web server access logs, and Referer headers — but it
+means our server-side callback needs a JavaScript bridge to convert
+hash → query params before the server can validate the token.
+
+**Pattern:** Two-stage `/auth/callback` route.
+
+```python
+# app/api/auth.py
+@router.get("/auth/callback", response_model=None)
+def auth_callback(
+    request: Request,
+    settings: SettingsDep,
+    access_token: str = "",
+    refresh_token: str = "",
+) -> Response:
+    # Stage 1: no access_token query param → user just landed from the
+    # email link with the token in the hash. Serve a tiny page whose JS
+    # reads window.location.hash and redirects to stage 2 with the
+    # tokens as query params.
+    if not access_token:
+        return HTMLResponse(
+            "<!doctype html><html><body><p>Signing in…</p><script>"
+            "var hash = window.location.hash.substring(1);"
+            "var params = new URLSearchParams(hash);"
+            "var at = params.get('access_token');"
+            "var rt = params.get('refresh_token') || '';"
+            "var qs = new URLSearchParams({access_token: at, refresh_token: rt});"
+            "window.location.replace('/auth/callback?' + qs.toString());"
+            "</script></body></html>"
+        )
+    # Stage 2: access_token in query param → validate via Supabase,
+    # set HttpOnly cookie, redirect to app.
+    resp = anon_client().auth.get_user(access_token)
+    if resp is None or resp.user is None:
+        raise HTTPException(status_code=410, detail="Sign-in link expired")
+    response = RedirectResponse(url="/passages/new", status_code=303)
+    response.set_cookie(
+        key="sb-access-token",
+        value=access_token,
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite="lax",
+        max_age=7 * 24 * 60 * 60,
+    )
+    return response
+```
+
+**Why not just a server-side fragment parser?** Because the hash
+never reaches the server. Reading `request.url.fragment` always
+returns empty. The browser is the only thing that sees it.
+
+**Why a fresh route instead of inlining the JS in the landing page?**
+Because the redirect from Supabase's email lands the user on
+`/auth/callback` specifically. Any other route's JS wouldn't run
+unless the user manually navigated there.
+
+**Security note:** The JS bridge moves the token from the URL hash
+(client-only) to the URL query string (visible in HTTP logs). The
+token's lifetime from there is one server hit before it gets stuffed
+in an HttpOnly cookie. The risk window is the time between the
+JS-triggered redirect and the cookie set — typically <100ms. Cloud
+Run access logs capture the query string but Cloud Run logs aren't
+end-user-readable. Acceptable trade-off; if you needed zero
+log-exposure, you'd POST the tokens from the JS bridge instead of
+redirecting GET — but that's incompatible with browser navigation
+expectations.
+
+**Render check:** the most common way this breaks during development
+is forgetting to add the callback URL to Supabase Auth's redirect
+allowlist (Dashboard → Authentication → URL Configuration). Without
+allowlisting, Supabase swaps the user to an error page instead of
+your callback. Symptom: the email magic link arrives but clicking
+lands on `auth.supabase.com/error` instead of your app.

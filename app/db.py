@@ -1,8 +1,10 @@
 """Database session management.
 
-Uses SQLModel (Pydantic + SQLAlchemy) with connection pooling suitable for
-Cloud Run. The pool is small because Cloud Run instances are short-lived
-and Neon's PgBouncer pooled endpoint handles cross-instance pooling.
+Uses SQLModel (Pydantic + SQLAlchemy) with connection pooling suitable
+for Cloud Run. The pool is small because Cloud Run instances are
+short-lived and Supabase's pooler (Supavisor) handles cross-instance
+pooling. `DATABASE_URL` should be the pooled connection string from
+Supabase Dashboard → Project Settings → Database.
 """
 
 from collections.abc import Generator
@@ -13,14 +15,15 @@ from app.config import get_settings
 
 _settings = get_settings()
 
-# Small pool: Cloud Run instances are ephemeral, Neon's pooled URL handles
-# global connection multiplexing. Never use the direct Neon URL from
-# Cloud Run — exhausts connections fast. See docs/PATTERN-LIBRARY.md.
+# Small pool: Cloud Run instances are ephemeral; Supabase's pooled URL
+# (Supavisor) handles global connection multiplexing. Never use the
+# direct DB URL from Cloud Run — exhausts connections fast. See
+# docs/PATTERN-LIBRARY.md.
 engine = create_engine(
     _settings.database_url,
     pool_size=5,
     max_overflow=10,
-    pool_pre_ping=True,  # Neon compute wakes on first query; pre-ping reconnects
+    pool_pre_ping=True,  # Reconnect after pooler drops idle conns
     pool_recycle=300,
 )
 

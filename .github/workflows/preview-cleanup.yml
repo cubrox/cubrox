@@ -26,8 +26,9 @@ jobs:
         # GitHub Actions hard-rejects `secrets.*` in `if:` expressions, so
         # we promote presence checks into outputs that downstream `if:`
         # gates can read. `gcp_configured` gates GCP cleanup; `auth_method`
-        # selects between WIF and SA key; `neon_configured` gates the
-        # Neon branch deletion.
+        # selects between WIF and SA key. The pre-SUPA-4 `neon_configured`
+        # gate is gone — Supabase auto-branching handles per-PR DB
+        # teardown without any workflow plumbing on our side.
         run: |
           if [ -n "${{ secrets.GCP_PROJECT_ID }}" ]; then
             echo "gcp_configured=true" >> "$GITHUB_OUTPUT"
@@ -42,22 +43,6 @@ jobs:
             echo "gcp_configured=false" >> "$GITHUB_OUTPUT"
             echo "auth_method=none" >> "$GITHUB_OUTPUT"
           fi
-          if [ -n "${{ secrets.NEON_API_KEY }}" ]; then
-            echo "neon_configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "neon_configured=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # ── Neon: delete the PR branch database ───────────────────────────
-
-      - name: Delete Neon branch
-        if: steps.check_secrets.outputs.neon_configured == 'true'
-        uses: neondatabase/delete-branch-action@v3
-        continue-on-error: true
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          branch: pr-${{ env.PR_NUMBER }}
-          api_key: ${{ secrets.NEON_API_KEY }}
 
       # ── GCP: remove the Cloud Run revision tag ────────────────────────
 
@@ -119,6 +104,6 @@ jobs:
           echo "Merged:    ${{ github.event.pull_request.merged }}"
           echo ""
           echo "Resources removed (if present):"
-          echo "  - Neon branch:            pr-${{ env.PR_NUMBER }}"
           echo "  - Cloud Run revision tag: pr-${{ env.PR_NUMBER }}"
+          echo "  - (Supabase branch teardown handled by the Supabase GitHub App)"
           echo "========================================"

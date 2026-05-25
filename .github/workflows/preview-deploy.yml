@@ -34,13 +34,13 @@ jobs:
         # GitHub Actions hard-rejects `secrets.*` in `if:` expressions, so
         # we promote presence checks into outputs that downstream `if:`
         # gates can read. `auth_method` selects between WIF (keyless,
-        # recommended) and SA key (workshop shortcut). `neon_configured`
-        # gates the per-PR Neon-branch creation step.
+        # recommended) and SA key (workshop shortcut). The pre-SUPA-4
+        # `neon_configured` gate is gone — Supabase auto-branching
+        # replaced it.
         run: |
           if [ -z "${{ secrets.GCP_PROJECT_ID }}" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "auth_method=none" >> "$GITHUB_OUTPUT"
-            echo "neon_configured=false" >> "$GITHUB_OUTPUT"
             echo "GCP_PROJECT_ID not configured — skipping preview deploy."
           elif [ -n "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ]; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -54,67 +54,23 @@ jobs:
             echo "neon_configured=false" >> "$GITHUB_OUTPUT"
             echo "No GCP auth configured — skipping preview deploy."
           fi
-          if [ -n "${{ secrets.NEON_API_KEY }}" ]; then
-            echo "neon_configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "neon_configured=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Checkout code
         if: steps.check_secrets.outputs.skip != 'true'
         uses: actions/checkout@v4
 
-      # ── Neon: create branch database for this PR ──────────────────────
-
-      - name: Create Neon branch
-        id: neon
-        if: steps.check_secrets.outputs.skip != 'true' && steps.check_secrets.outputs.neon_configured == 'true'
-        uses: neondatabase/create-branch-action@v5
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          branch_name: pr-${{ env.PR_NUMBER }}
-          # Workshop forks set NEON_PARENT_BRANCH to the attendee's branch name
-          # (e.g. "alice") so per-PR previews inherit that attendee's schema.
-          # Non-workshop forks leave it unset and fall back to the literal
-          # string "main" — which assumes the Neon project's default branch
-          # is named "main". Projects that were created with a different
-          # default name (e.g. "production") MUST set NEON_PARENT_BRANCH
-          # explicitly per fork; the literal-string fallback below does not
-          # query the project's actual default and will silently fail or
-          # create a sibling. See docs/PLATFORM-GUIDE.md "Neon Branch Model"
-          # for the canonical naming requirements (#90).
-          # `||` is fine inside `with:` — only `if:` rejects `secrets.*`.
-          parent: ${{ secrets.NEON_PARENT_BRANCH || 'main' }}
-          username: ${{ vars.NEON_DB_USER || 'neondb_owner' }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-
-      # ── Apply Alembic migrations to the Neon branch ──────────────────
-
-      - name: Verify Neon branch produced a usable connection URL
-        # Silent-skip-cascade guard (#52). When neon_configured is true,
-        # `Create Neon branch` MUST produce `db_url_with_pooler`. An
-        # empty output here means the Neon action ran but failed to
-        # emit its output (e.g. an output-name typo regression, an API
-        # change, or a transient Neon API failure). Without this step,
-        # downstream gates would silently skip migrations and the
-        # preview deploy would ship with an empty DATABASE_URL — green
-        # CI, broken preview. Fail loud here turns the latent failure
-        # into a workflow-level error users actually see. See #52, #78.
-        if: steps.check_secrets.outputs.skip != 'true' && steps.check_secrets.outputs.neon_configured == 'true'
-        run: |
-          if [ -z "${{ steps.neon.outputs.db_url_with_pooler }}" ]; then
-            echo "::error::Neon branch step succeeded but did not emit db_url_with_pooler."
-            echo "::error::This is a silent-failure regression — the action ran but produced no usable output."
-            echo "::error::Likely causes: output-name typo, Neon action API change, or upstream transient failure."
-            exit 1
-          fi
-          echo "Neon db_url_with_pooler is populated; proceeding to migrations."
-
-      # Schema migrations for the preview environment now run via the
-      # Supabase GitHub App auto-branching integration (per SUPA-1 /
-      # #80). The alembic chain was deleted in SUPA-2b / #87. The Neon
-      # branch creation step above is still here because SUPA-4 (#83)
-      # hasn't yet swapped preview DB infra to Supabase branches.
+      # Preview-DB plumbing: SUPA-4 (#83) removed the per-PR Neon branch
+      # creation step that used to live here. Schema migrations for
+      # preview now run via the Supabase GitHub App auto-branching
+      # integration (per SUPA-1 / #80), which spins up a Supabase
+      # Postgres branch per PR + applies the supabase/migrations/*.sql
+      # against it without any workflow plumbing on our side.
+      #
+      # The Cloud Run preview revision deployed below uses the same
+      # DATABASE_URL as production for now (pre-launch shared DB is
+      # acceptable). When usage grows, file a follow-up to inject the
+      # per-PR Supabase branch URL via `supabase branches get pr-N`
+      # in this workflow — requires a SUPABASE_ACCESS_TOKEN secret
+      # the operator hasn't yet provisioned.
 
       # ── GCP: auth and build image ─────────────────────────────────────
 
@@ -157,29 +113,16 @@ jobs:
         if: steps.check_secrets.outputs.skip != 'true'
         id: deploy
         run: |
-          # Build the runtime env var list. DATABASE_URL comes from Neon
-          # branch output if available, otherwise falls back to the default
-          # secret mount (production DB). We merge all env vars into a
-          # single --set-env-vars value because gcloud forbids combining
-          # --set-env-vars with --update-env-vars in one invocation.
+          # Build the runtime env var list. DATABASE_URL points at the
+          # production Supabase Postgres for preview deploys too — this
+          # is acceptable pre-launch where there's no real prod data to
+          # contaminate. When usage grows, swap to a per-PR Supabase
+          # branch URL via `supabase branches get pr-${PR_NUMBER}`.
           # The ^;^ prefix changes gcloud's KEY=val separator from comma
-          # to ';'. Required because Neon URLs contain '@' (user@host) and
-          # may URL-encode commas in passwords; ';' is forbidden in URLs
-          # and not used by gcloud as a default separator anywhere else.
+          # to ';' (URL passwords often contain commas).
           ENV_VARS="^;^ENVIRONMENT=preview;PR_NUMBER=${{ env.PR_NUMBER }}"
-          if [ -n "${{ steps.neon.outputs.db_url_with_pooler }}" ]; then
-            ENV_VARS="${ENV_VARS};DATABASE_URL=${{ steps.neon.outputs.db_url_with_pooler }}"
-          fi
-          # Sign-in flow needs SESSION_SECRET (cookie signer; AUTH-2 #10)
-          # and RESEND_API_KEY (magic-link email send; AUTH-1 #9). Both
-          # are repo secrets. Empty values fall through silently — the
-          # app's Settings validators will refuse to start with bad
-          # defaults, which is the desired behavior.
-          if [ -n "${{ secrets.SESSION_SECRET }}" ]; then
-            ENV_VARS="${ENV_VARS};SESSION_SECRET=${{ secrets.SESSION_SECRET }}"
-          fi
-          if [ -n "${{ secrets.RESEND_API_KEY }}" ]; then
-            ENV_VARS="${ENV_VARS};RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}"
+          if [ -n "${{ secrets.PRODUCTION_DATABASE_URL }}" ]; then
+            ENV_VARS="${ENV_VARS};DATABASE_URL=${{ secrets.PRODUCTION_DATABASE_URL }}"
           fi
 
           # --service-account pins the runtime SA to the deployer SA so
@@ -290,7 +233,6 @@ jobs:
         with:
           script: |
             const previewUrl = '${{ steps.deploy.outputs.preview_url }}';
-            const neonBranch = '${{ steps.neon.outputs.branch_id }}';
             const smoke = '${{ steps.smoke_test.outputs.result }}';
 
             let body = '## Preview Deployment\n\n';
@@ -298,7 +240,6 @@ jobs:
             body += '|-----------|--------|\n';
             body += `| Preview URL | ${previewUrl || 'Not deployed'} |\n`;
             body += `| Cloud Run tag | \`pr-${{ env.PR_NUMBER }}\` |\n`;
-            body += `| Neon branch | ${neonBranch ? `\`pr-${{ env.PR_NUMBER }}\`` : 'Not configured'} |\n`;
             body += `| Smoke test | ${smoke === 'passed' ? 'Passed' : smoke === 'failed' ? 'Failed' : 'Skipped'} |\n\n`;
 
             if (previewUrl && smoke === 'passed') {

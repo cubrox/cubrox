@@ -34,4 +34,14 @@ EXPOSE 8080
 
 # Run uvicorn directly — no shell, signals propagate cleanly for graceful
 # shutdown. `--host 0.0.0.0` is explicit so we bind on all interfaces.
-CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+#
+# --proxy-headers + --forwarded-allow-ips=* make uvicorn trust the
+# X-Forwarded-* headers Cloud Run's proxy sets. Without this, code that
+# builds URLs from `request.url` (Supabase magic-link callback redirect
+# URL is the canonical case) gets the internal Cloud Run origin instead
+# of the public host, and emails arrive with unclickable links. Safe
+# on Cloud Run because the only thing in front of the container is
+# Google's trusted proxy. Pattern #4 in docs/PATTERN-LIBRARY.md.
+CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", \
+     "--host", "0.0.0.0", "--port", "8080", \
+     "--proxy-headers", "--forwarded-allow-ips=*"]

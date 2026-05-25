@@ -161,22 +161,17 @@ jobs:
           # Non-secret config sourced from GitHub repository Variables
           # (with safe defaults so a fresh fork deploys without manual
           # GitHub Settings touches):
-          #   - vars.MAGIC_LINK_BASE_URL   → MAGIC_LINK_BASE_URL
-          #     Default: the Cloud Run-issued URL. Override once a custom
-          #     domain is mapped to the service.
-          #   - vars.MAGIC_LINK_FROM_EMAIL → MAGIC_LINK_FROM_EMAIL
-          #     Default: onboarding@resend.dev — Resend's shared free-tier
-          #     sender, which can only deliver to the Resend account
-          #     owner's address. Once a domain is verified at Resend,
-          #     override this var with noreply@<verified-domain>.
+          # SUPA-4 (#83) stripped RESEND_API_KEY, SESSION_SECRET,
+          # MAGIC_LINK_BASE_URL, MAGIC_LINK_FROM_EMAIL — none are
+          # read by the app after SUPA-2c. Cloud Run still kept them
+          # in the revision spec from prior deploys; this assertion
+          # of the full env_vars block also implicitly removes them
+          # from future revisions (deploy-cloudrun@v2 uses set/replace
+          # semantics on each deploy).
           env_vars: |
             ENVIRONMENT=production
             DATABASE_URL=${{ secrets.PRODUCTION_DATABASE_URL }}
-            SESSION_SECRET=${{ secrets.SESSION_SECRET }}
-            RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
             ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
-            MAGIC_LINK_BASE_URL=${{ vars.MAGIC_LINK_BASE_URL || 'https://agile-flow-app-heo5ry7rua-uc.a.run.app' }}
-            MAGIC_LINK_FROM_EMAIL=${{ vars.MAGIC_LINK_FROM_EMAIL || 'onboarding@resend.dev' }}
           # SUPA-3 (#82): mount Supabase credentials from GCP Secret
           # Manager at runtime. Provisioned in SUPA-1 (#80) +
           # operator-side setup. The runtime SA already has the

@@ -82,32 +82,55 @@ BEGIN
     END IF;
 END $$;
 
--- Drop any leftover alembic-era FK constraints that pointed at the
--- deleted `public.user` table. Recreate the FK against `auth.users`
--- to match what the supabase-era initial_schema.sql declares.
+-- FK constraint cleanup + recreate.
 --
--- Why this matters: if the data-migration preserved the column but the
--- old `public.user` table was dropped on the way to Supabase, the FK
--- constraint is dangling. On a database where the FK already points at
--- auth.users (fresh supabase bootstrap), the DROP IF EXISTS is a no-op
--- and the ADD CONSTRAINT either succeeds (if missing) or duplicates —
--- so we DROP IF EXISTS first to make ADD idempotent.
+-- We need to handle three FK relationships across these three tables:
+--   * passage.owner_id        → auth.users(id)
+--   * preference.owner_id     → auth.users(id)
+--   * reading_event.owner_id  → auth.users(id)
+--   * reading_event.passage_id → public.passage(id)   (NOT touched by the rename)
+--
+-- The alembic-era FKs pointed at `public.user(id)` (now-deleted) for
+-- the owner side. The supabase-era FKs point at `auth.users(id)`. So
+-- we drop ONLY the owner-side FKs (whether they reference public.user
+-- or auth.users) and re-add them against auth.users. The passage_id
+-- FK is left alone — its target (public.passage) exists in both eras
+-- and the rename doesn't touch it.
+--
+-- The DROP loop is narrowed to FKs whose target is `auth.users` or
+-- `public.user` to avoid silently dropping unrelated FKs (most
+-- importantly `reading_event.passage_id_fkey`, which the supabase-era
+-- schema needs preserved). See #106 review.
+--
+-- We use `NOT VALID` on the auth.users FKs and a follow-up
+-- `VALIDATE CONSTRAINT` step. This is the standard Postgres pattern
+-- for adding an FK to a table that may have rows whose foreign-key
+-- values predate the constraint (e.g., orphan owner_id UUIDs left
+-- behind by the alembic→Supabase data migration). With `NOT VALID`:
+--   * The constraint is recorded in the catalog.
+--   * Future INSERT / UPDATE rows are enforced normally.
+--   * Existing rows are NOT validated yet, so the migration won't
+--     abort mid-transaction if any orphan exists.
+-- After the migration runs cleanly, the operator can validate by
+-- running `ALTER TABLE ... VALIDATE CONSTRAINT ...` once they've
+-- confirmed (or cleaned up) any orphans. See PR #106 body.
 DO $$
 DECLARE
     fk_record RECORD;
 BEGIN
-    -- Drop ANY foreign-key constraint on passage.owner_id /
-    -- preference.owner_id / reading_event.owner_id, regardless of
-    -- target. We re-add the auth.users FK below.
     FOR fk_record IN
-        SELECT conname, conrelid::regclass AS table_name
-        FROM pg_constraint
-        WHERE contype = 'f'
-          AND conrelid IN (
+        SELECT con.conname,
+               con.conrelid::regclass AS table_name
+        FROM pg_constraint con
+        JOIN pg_class target ON target.oid = con.confrelid
+        JOIN pg_namespace ns ON ns.oid = target.relnamespace
+        WHERE con.contype = 'f'
+          AND con.conrelid IN (
               'public.passage'::regclass,
               'public.preference'::regclass,
               'public.reading_event'::regclass
           )
+          AND ns.nspname || '.' || target.relname IN ('auth.users', 'public.user')
     LOOP
         EXECUTE format(
             'ALTER TABLE %s DROP CONSTRAINT IF EXISTS %I',
@@ -116,14 +139,40 @@ BEGIN
     END LOOP;
 END $$;
 
+-- Re-add the owner-side FKs as NOT VALID so the migration doesn't abort
+-- on any pre-existing orphan rows in production.
 ALTER TABLE public.passage
     ADD CONSTRAINT passage_owner_id_fkey
-        FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+        FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE
+        NOT VALID;
 
 ALTER TABLE public.preference
     ADD CONSTRAINT preference_owner_id_fkey
-        FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+        FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE
+        NOT VALID;
 
 ALTER TABLE public.reading_event
     ADD CONSTRAINT reading_event_owner_id_fkey
-        FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+        FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE
+        NOT VALID;
+
+-- Ensure `reading_event.passage_id_fkey` is present and shaped per the
+-- supabase-era initial_schema. The alembic-era version had the same
+-- target (public.passage) and shape (ON DELETE CASCADE), so on prod
+-- this is a no-op IF the FK already exists with the right shape — and
+-- a safety-net if a previous version of this file (which had a
+-- too-aggressive DROP loop) accidentally removed it. See #106 review.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint con
+        JOIN pg_class target ON target.oid = con.confrelid
+        WHERE con.contype = 'f'
+          AND con.conrelid = 'public.reading_event'::regclass
+          AND target.relname = 'passage'
+    ) THEN
+        ALTER TABLE public.reading_event
+            ADD CONSTRAINT reading_event_passage_id_fkey
+                FOREIGN KEY (passage_id) REFERENCES public.passage(id) ON DELETE CASCADE;
+    END IF;
+END $$;

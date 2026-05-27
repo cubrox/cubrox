@@ -70,4 +70,25 @@
       </fieldset>
     {% endfor %}
   </aside>
+
+  <script>
+    // Reflect the just-clicked preference button as `aria-pressed=true`
+    // (and reset its siblings) immediately on click — without this, the
+    // selected-state visual stays on the old button until the page is
+    // reloaded, because the HTMX swap only replaces the inline
+    // <style> block, not the buttons themselves.
+    //
+    // Delegated on the document so it works after any future re-renders
+    // of the .reader-controls aside. The server-rendered aria-pressed
+    // values remain the source of truth at page load; this handler
+    // keeps them in sync with the user's clicks in between.
+    document.addEventListener("click", function (event) {
+      var btn = event.target.closest(".reader-control-group button[aria-pressed]");
+      if (!btn) return;
+      var siblings = btn.parentElement.querySelectorAll("button[aria-pressed]");
+      siblings.forEach(function (b) {
+        b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+      });
+    });
+  </script>
 {% endblock %}

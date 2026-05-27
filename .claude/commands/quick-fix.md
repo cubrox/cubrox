@@ -12,8 +12,9 @@ Before any work, verify the following. STOP and report if any check fails.
 1. **GitHub account is correct** — Run `gh auth status` and confirm the active
    account matches the expected worker/bot account. If only a personal account
    is active, STOP and instruct the user to run `scripts/ensure-github-account.sh`.
-2. **MCP GitHub server is reachable** — Attempt a GitHub MCP tool call. If the
-   MCP server is not connected, STOP.
+2. **`gh` CLI is authenticated and the repository is accessible** — Run
+   `gh auth status` and `gh repo view --json nameWithOwner`. If either fails,
+   STOP and instruct the user to fix the issue.
 
 ## When to Use This Command
 

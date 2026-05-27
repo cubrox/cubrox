@@ -221,6 +221,166 @@ else
 fi
 popd >/dev/null
 
+###############################################################################
+# Scenario 3: configurable upstream + redirect-safe curl + 404 fallback (#331)
+###############################################################################
+# These scenarios exit early (before the tarball download) so they only need
+# to verify which curl URL was hit for the /releases/latest call. We stub
+# curl to record the URL and return a no-op JSON, and stub gh to satisfy the
+# auth precondition.
+
+UPSTREAM_DIR="$WORK_DIR/upstream-scenarios"
+mkdir -p "$UPSTREAM_DIR/scripts/lib"
+cp scripts/template-sync.sh "$UPSTREAM_DIR/scripts/template-sync.sh"
+cp scripts/lib/overrides.sh "$UPSTREAM_DIR/scripts/lib/overrides.sh"
+chmod +x "$UPSTREAM_DIR/scripts/template-sync.sh"
+
+mkdir -p "$WORK_DIR/upstream-bin"
+# Curl stub: log each releases/latest URL probed and respond per the test's
+# scripted policy (env-driven). For tarball downloads, behave as a no-op.
+cat > "$WORK_DIR/upstream-bin/curl" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+url=""
+for arg in "$@"; do
+  case "$arg" in
+    https://*|http://*) url="$arg" ;;
+  esac
+done
+if [[ "$url" == *"/releases/latest"* ]]; then
+  echo "$url" >> "$TEST_CURL_LOG"
+  # Policy: if TEST_PRIMARY_REPO matches the URL, return 200 JSON; if
+  # TEST_FALLBACK_REPO matches and primary was tried, return 200 JSON; else 404.
+  if [[ -n "${TEST_404_REPOS:-}" ]] && [[ ",$TEST_404_REPOS," == *",$url,"* ]]; then
+    exit 22  # curl's -f exit code for HTTP >= 400
+  fi
+  printf '{"tag_name":"v9.9.9","html_url":"https://example.invalid/r","tarball_url":"https://example.invalid/t.tar.gz"}'
+  exit 0
+fi
+if [[ "$url" == *".tar.gz"* ]]; then
+  out=''
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "-o" ]; then out="$2"; shift 2; continue; fi
+    shift
+  done
+  : > "$out"
+  exit 0
+fi
+exit 1
+SH
+chmod +x "$WORK_DIR/upstream-bin/curl"
+
+cat > "$WORK_DIR/upstream-bin/gh" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "auth" && "${2:-}" == "token" ]]; then echo "fake-token"; exit 0; fi
+exit 0
+SH
+chmod +x "$WORK_DIR/upstream-bin/gh"
+
+run_upstream_scenario() {
+  local label="$1"
+  local upstream_field="$2"
+  local expected_first_repo="$3"  # owner/repo expected on the FIRST curl
+  local fail_404_repos="$4"        # comma-joined list of full URLs to 404
+  local scenario_dir="$WORK_DIR/scen-${label}"
+  local curl_log="$WORK_DIR/curl-${label}.log"
+  : > "$curl_log"
+
+  mkdir -p "$scenario_dir/scripts/lib"
+  cp scripts/template-sync.sh "$scenario_dir/scripts/template-sync.sh"
+  cp scripts/lib/overrides.sh "$scenario_dir/scripts/lib/overrides.sh"
+  chmod +x "$scenario_dir/scripts/template-sync.sh"
+  : > "$scenario_dir/.agile-flow-overrides"
+
+  if [ -n "$upstream_field" ]; then
+    cat > "$scenario_dir/.agile-flow-version" <<JSON
+{
+  "version": "9.9.9",
+  "upstream": "$upstream_field",
+  "syncDirectories": ["./scripts"]
+}
+JSON
+  else
+    cat > "$scenario_dir/.agile-flow-version" <<'JSON'
+{
+  "version": "9.9.9",
+  "syncDirectories": ["./scripts"]
+}
+JSON
+  fi
+
+  pushd "$scenario_dir" >/dev/null
+  git init >/dev/null
+  git add .
+  git commit -m "init $label" >/dev/null
+  # Run the script; since LOCAL_VERSION already matches the mock's v9.9.9,
+  # the script exits 0 right after the version fetch — exactly what we want.
+  TEST_CURL_LOG="$curl_log" \
+    TEST_404_REPOS="$fail_404_repos" \
+    PATH="$WORK_DIR/upstream-bin:$PATH" \
+    bash scripts/template-sync.sh > "$WORK_DIR/scen-${label}.log" 2>&1 || true
+  popd >/dev/null
+
+  local first_url
+  first_url=$(head -n1 "$curl_log" || true)
+  if [[ "$first_url" == *"/repos/${expected_first_repo}/releases/latest" ]]; then
+    pass "[${label}] first curl targets ${expected_first_repo}"
+  else
+    fail "[${label}] expected first curl to target ${expected_first_repo}, got: ${first_url:-<none>}"
+  fi
+}
+
+# (a) upstream field honored when present
+run_upstream_scenario "upstream-honored" "vibeacademy/agile-flow-gcp" "vibeacademy/agile-flow-gcp" ""
+
+# (a2) upstream URL form normalized to owner/repo
+run_upstream_scenario "upstream-url-normalized" "https://github.com/vibeacademy/agile-flow-gcp" "vibeacademy/agile-flow-gcp" ""
+
+# (b) absent upstream falls back to hardcoded default
+run_upstream_scenario "upstream-absent" "" "vibeacademy/agile-flow" ""
+
+# (c) 404 from primary -> fallback URL is tried
+FAIL_URL="https://api.github.com/repos/vibeacademy/agile-flow/releases/latest"
+SCEN_DIR="$WORK_DIR/scen-fallback"
+mkdir -p "$SCEN_DIR/scripts/lib"
+cp scripts/template-sync.sh "$SCEN_DIR/scripts/template-sync.sh"
+cp scripts/lib/overrides.sh "$SCEN_DIR/scripts/lib/overrides.sh"
+chmod +x "$SCEN_DIR/scripts/template-sync.sh"
+: > "$SCEN_DIR/.agile-flow-overrides"
+cat > "$SCEN_DIR/.agile-flow-version" <<'JSON'
+{
+  "version": "9.9.9",
+  "syncDirectories": ["./scripts"]
+}
+JSON
+pushd "$SCEN_DIR" >/dev/null
+git init >/dev/null
+git add .
+git commit -m "init fallback" >/dev/null
+TEST_CURL_LOG="$WORK_DIR/curl-fallback.log" \
+  TEST_404_REPOS="$FAIL_URL" \
+  PATH="$WORK_DIR/upstream-bin:$PATH" \
+  bash scripts/template-sync.sh > "$WORK_DIR/scen-fallback.log" 2>&1 || true
+popd >/dev/null
+
+URL1=$(sed -n '1p' "$WORK_DIR/curl-fallback.log" || true)
+URL2=$(sed -n '2p' "$WORK_DIR/curl-fallback.log" || true)
+if [[ "$URL1" == *"/repos/vibeacademy/agile-flow/releases/latest" ]]; then
+  pass "[fallback] primary URL tried first"
+else
+  fail "[fallback] expected primary URL first, got: ${URL1:-<none>}"
+fi
+if [[ "$URL2" == *"/repos/vibeacademy/gembaflow/releases/latest" ]]; then
+  pass "[fallback] fallback URL tried after primary 404"
+else
+  fail "[fallback] expected gembaflow fallback URL second, got: ${URL2:-<none>}"
+fi
+if grep -q "retrying against fallback vibeacademy/gembaflow" "$WORK_DIR/scen-fallback.log"; then
+  pass "[fallback] informational stderr line emitted"
+else
+  fail "[fallback] expected informational fallback log line"
+fi
+
 echo "Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed"
 if [ "$TESTS_FAILED" -gt 0 ]; then
   exit 1

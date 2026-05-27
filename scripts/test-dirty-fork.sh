@@ -48,6 +48,14 @@ ensure_git_repo() {
   fi
 }
 
+# Safety warning for destructive scenarios
+warn_will_modify() {
+  log_warn "⚠️  This will modify your working tree!"
+  log_warn "Run in a TEST FORK, not your main development repo."
+  log_warn "Press Ctrl+C within 3 seconds to abort..."
+  sleep 3
+}
+
 # Scenario: post-bootstrap-product
 # Simulates user who ran /bootstrap-product
 scenario_post_bootstrap_product() {
@@ -401,42 +409,52 @@ main() {
   case "$SCENARIO" in
     post-bootstrap-product)
       ensure_git_repo
+      warn_will_modify
       scenario_post_bootstrap_product
       ;;
     post-bootstrap-full)
       ensure_git_repo
+      warn_will_modify
       scenario_post_bootstrap_full
       ;;
     modified-agents)
       ensure_git_repo
+      warn_will_modify
       scenario_modified_agents
       ;;
     modified-commands)
       ensure_git_repo
+      warn_will_modify
       scenario_modified_commands
       ;;
     has-overrides)
       ensure_git_repo
+      warn_will_modify
       scenario_has_overrides
       ;;
     uncommitted-framework)
       ensure_git_repo
+      warn_will_modify
       scenario_uncommitted_framework
       ;;
     uncommitted-userland)
       ensure_git_repo
+      warn_will_modify
       scenario_uncommitted_userland
       ;;
     mid-feature)
       ensure_git_repo
+      warn_will_modify
       scenario_mid_feature
       ;;
     stale-version)
       ensure_git_repo
+      warn_will_modify
       scenario_stale_version
       ;;
     mixed-mess)
       ensure_git_repo
+      warn_will_modify
       scenario_mixed_mess
       ;;
     clean)

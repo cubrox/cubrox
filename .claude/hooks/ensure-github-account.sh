@@ -26,6 +26,20 @@ tool_name=$(echo "$input" | jq -r '.tool_name // empty')
 tool_command=$(echo "$input" | jq -r '.tool_input.command // empty')
 
 # Determine required account based on tool
+#
+# Routing rules (narrow on purpose):
+#   - `gh pr create`                     -> WORKER   (PR authorship)
+#   - `gh pr review` / `gh pr comment`   -> REVIEWER (PR approval / review comments)
+#   - all other gh commands              -> passthrough (no enforcement)
+#
+# Why so narrow: command patterns alone cannot reliably distinguish
+# "issue created during work" (worker) from "issue created during review
+# as a follow-up" (reviewer). The same applies to `gh project item-*`
+# board moves. Slash commands that need a specific account (e.g. the
+# reviewer when `/review-pr` files a follow-up ticket) are responsible
+# for calling `gh auth switch --user <account>` explicitly before
+# those operations. This hook only enforces the two cases where the
+# command name itself is unambiguous about which account should own it.
 required_account=""
 case "$tool_name" in
   Bash)
@@ -33,7 +47,7 @@ case "$tool_name" in
       *"gh pr create"*)
         required_account="$WORKER_ACCOUNT"
         ;;
-      *"gh pr review"*)
+      *"gh pr review"*|*"gh pr comment"*)
         required_account="$REVIEWER_ACCOUNT"
         ;;
       *)

@@ -28,10 +28,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_pass() { echo -e "${GREEN}[PASS]${NC} $1"; }
-log_fail() { echo -e "${RED}[FAIL]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_info() { echo -e "${BLUE}[INFO]${NC} $1" >&2; }
+log_pass() { echo -e "${GREEN}[PASS]${NC} $1" >&2; }
+log_fail() { echo -e "${RED}[FAIL]${NC} $1" >&2; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $1" >&2; }
 
 # Test results tracking
 TESTS_RUN=0
@@ -39,37 +39,74 @@ TESTS_PASSED=0
 TESTS_FAILED=0
 declare -a FAILED_TESTS=()
 
+# Safety check: refuse to run if host repo is dirty
+check_host_repo_clean() {
+  cd "$REPO_ROOT" || exit 1
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    log_fail "Host repo has uncommitted changes. Commit or stash before running tests."
+    log_fail "This prevents test scenarios from accidentally polluting your working tree."
+    exit 1
+  fi
+}
+
 # Initialize a fresh test fork
+# IMPORTANT: This function outputs ONLY the test_dir path to stdout.
+# All other output goes to stderr to prevent $() capture pollution.
 init_test_fork() {
   local test_name="$1"
   local test_dir="$TEST_WORKDIR/$test_name"
+  
+  # Always start from repo root to ensure consistent cwd
+  cd "$REPO_ROOT" || exit 1
   
   rm -rf "$test_dir"
   mkdir -p "$test_dir"
   
   # Copy repo (excluding .git to simulate fresh clone, then re-init)
   rsync -a --exclude='.git' --exclude='node_modules' --exclude='.venv' \
-    "$REPO_ROOT/" "$test_dir/"
+    "$REPO_ROOT/" "$test_dir/" 2>&1 >&2
   
-  cd "$test_dir" || exit
-  git init -q
-  git add -A
-  git commit -q -m "Initial fork state"
+  cd "$test_dir" || exit 1
+  
+  # Suppress all git output - only the path should go to stdout
+  git init -q >/dev/null 2>&1
+  git add -A >/dev/null 2>&1
+  git commit -q -m "Initial fork state" >/dev/null 2>&1 || true
   
   # Set up as downstream fork
   mkdir -p .agile-flow-meta
   echo "vibeacademy/agile-flow" > .agile-flow-meta/upstream
   echo "v1.0.8" > .agile-flow-meta/version  # Start one version behind
   
-  git add .agile-flow-meta
-  git commit -q -m "Configure as downstream fork"
+  git add .agile-flow-meta >/dev/null 2>&1
+  git commit -q -m "Configure as downstream fork" >/dev/null 2>&1 || true
   
+  # Return to repo root before outputting path
+  cd "$REPO_ROOT" || exit 1
+  
+  # Output ONLY the path - this is what $() captures
   echo "$test_dir"
+}
+
+# Validate we're in the expected directory before writing files
+assert_cwd() {
+  local expected="$1"
+  local actual
+  actual=$(pwd)
+  if [ "$actual" != "$expected" ]; then
+    log_fail "CWD assertion failed: expected '$expected', got '$actual'"
+    log_fail "Refusing to write to prevent host repo pollution"
+    exit 1
+  fi
 }
 
 # Apply a dirty scenario (inline, not calling external script)
 apply_scenario() {
   local scenario="$1"
+  local test_dir="$2"
+  
+  # Safety: assert we're in the test directory, not host repo
+  assert_cwd "$test_dir"
   
   case "$scenario" in
     post-bootstrap-product)
@@ -86,8 +123,8 @@ PDEOF
 ## Phase 1
 - [ ] Test upgrade flow
 PREOF
-      git add docs/PRODUCT-*.md
-      git commit -q -m "Complete bootstrap-product"
+      git add docs/PRODUCT-*.md >/dev/null 2>&1
+      git commit -q -m "Complete bootstrap-product" >/dev/null 2>&1 || true
       ;;
       
     modified-agents)
@@ -98,8 +135,8 @@ PREOF
           echo "- Use TypeScript strict mode"
           echo "- Prefer functional components"
         } >> .claude/agents/github-ticket-worker.md
-        git add .claude/agents/github-ticket-worker.md
-        git commit -q -m "Add custom agent guidelines"
+        git add .claude/agents/github-ticket-worker.md >/dev/null 2>&1
+        git commit -q -m "Add custom agent guidelines" >/dev/null 2>&1 || true
       fi
       ;;
       
@@ -109,8 +146,8 @@ PREOF
 .claude/agents/github-ticket-worker.md
 .claude/commands/work-ticket.md
 OVEOF
-      git add .agile-flow-overrides
-      git commit -q -m "Configure overrides"
+      git add .agile-flow-overrides >/dev/null 2>&1
+      git commit -q -m "Configure overrides" >/dev/null 2>&1 || true
       ;;
       
     uncommitted-framework)
@@ -128,8 +165,8 @@ OVEOF
       
     stale-version)
       echo "v0.9.0" > .agile-flow-meta/version
-      git add .agile-flow-meta/version
-      git commit -q -m "Set stale version"
+      git add .agile-flow-meta/version >/dev/null 2>&1
+      git commit -q -m "Set stale version" >/dev/null 2>&1 || true
       ;;
       
     clean)
@@ -149,7 +186,7 @@ run_upgrade() {
   local output_file="$test_dir/.upgrade-output.txt"
   local exit_code
   
-  cd "$test_dir" || exit
+  cd "$test_dir" || exit 1
   
   # Run template-sync.sh and capture output
   if [ -f "scripts/template-sync.sh" ]; then
@@ -160,13 +197,23 @@ run_upgrade() {
     exit_code=127
   fi
   
+  # Return to repo root after running upgrade
+  cd "$REPO_ROOT" || exit 1
+  
   echo "$exit_code"
 }
 
 # Validation functions
+
 check_no_conflict_markers() {
   local test_dir="$1"
-  if grep -rq "<<<<<<< " "$test_dir" --include="*.md" --include="*.sh" 2>/dev/null; then
+  # Use regex anchored at line start to avoid matching grep patterns in scripts
+  # Exclude the test script itself from the search
+  if grep -rE '^<{7} ' "$test_dir" \
+       --include="*.md" --include="*.sh" \
+       --exclude="test-upgrade-cycle.sh" \
+       --exclude="test-dirty-fork.sh" \
+       2>/dev/null; then
     return 1
   fi
   return 0
@@ -174,15 +221,18 @@ check_no_conflict_markers() {
 
 check_version_updated() {
   local test_dir="$1"
-  local expected_version="${2:-v1.0.9}"
+  # Don't hardcode version - check that it's different from the starting v1.0.8
+  # and that it looks like a valid version tag
   local actual_version
   
   if [ -f "$test_dir/.agile-flow-meta/version" ]; then
     actual_version=$(cat "$test_dir/.agile-flow-meta/version")
-    [ "$actual_version" = "$expected_version" ]
-  else
-    return 1
+    # Version should be updated from starting v1.0.8 and match vX.Y.Z pattern
+    if [ "$actual_version" != "v1.0.8" ] && [[ "$actual_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      return 0
+    fi
   fi
+  return 1
 }
 
 check_overrides_preserved() {
@@ -215,9 +265,7 @@ check_upgrade_blocked() {
   grep -q "refusing to upgrade" "$output_file" 2>/dev/null
 }
 
-# Test case definitions
-# Format: test_<name> { scenario, expected_outcome, validations }
-
+# Test case runner
 run_test_case() {
   local test_name="$1"
   local scenario="$2"
@@ -228,13 +276,27 @@ run_test_case() {
   TESTS_RUN=$((TESTS_RUN + 1))
   log_info "Running test: $test_name"
   
+  # Always start from repo root
+  cd "$REPO_ROOT" || exit 1
+  
   # Initialize fresh fork
   local test_dir
   test_dir=$(init_test_fork "$test_name")
   
-  # Apply scenario
-  cd "$test_dir" || exit
-  apply_scenario "$scenario"
+  # Validate the captured path looks correct
+  if [[ ! "$test_dir" =~ ^/ ]] || [[ ! -d "$test_dir" ]]; then
+    log_fail "$test_name: init_test_fork returned invalid path: '$test_dir'"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    FAILED_TESTS+=("$test_name")
+    return
+  fi
+  
+  # Apply scenario (pass test_dir for cwd assertion)
+  cd "$test_dir" || exit 1
+  apply_scenario "$scenario" "$test_dir"
+  
+  # Return to repo root before running upgrade
+  cd "$REPO_ROOT" || exit 1
   
   # Run upgrade
   local exit_code
@@ -247,7 +309,7 @@ run_test_case() {
   if [ "$expect_success" = "true" ]; then
     if [ "$exit_code" != "0" ]; then
       log_fail "$test_name: Expected success but got exit code $exit_code"
-      cat "$output_file" | head -20
+      head -20 "$output_file" >&2
       test_passed=false
     fi
   else
@@ -301,6 +363,9 @@ run_test_case() {
     FAILED_TESTS+=("$test_name")
   fi
   
+  # Return to repo root BEFORE cleanup to avoid cwd-in-deleted-dir bug
+  cd "$REPO_ROOT" || exit 1
+  
   # Cleanup
   rm -rf "$test_dir"
 }
@@ -309,7 +374,10 @@ run_test_case() {
 run_all_tests() {
   log_info "Starting upgrade cycle tests..."
   log_info "Work directory: $TEST_WORKDIR"
-  echo ""
+  echo "" >&2
+  
+  # Safety check before running any tests
+  check_host_repo_clean
   
   mkdir -p "$TEST_WORKDIR"
   
@@ -326,7 +394,6 @@ run_all_tests() {
     "no-conflicts" "version-updated"
   
   # Test 4: Modified agents WITH overrides (should preserve)
-  # This needs a compound scenario
   run_test_case_compound "modified-agents-with-override" \
     "modified-agents" "has-overrides" \
     "true" \
@@ -344,16 +411,16 @@ run_all_tests() {
   run_test_case "stale-version-upgrade" "stale-version" "true" \
     "no-conflicts" "version-updated"
   
-  echo ""
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo -e "Tests run: $TESTS_RUN | ${GREEN}Passed: $TESTS_PASSED${NC} | ${RED}Failed: $TESTS_FAILED${NC}"
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "" >&2
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+  echo -e "Tests run: $TESTS_RUN | ${GREEN}Passed: $TESTS_PASSED${NC} | ${RED}Failed: $TESTS_FAILED${NC}" >&2
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
   
   if [ ${#FAILED_TESTS[@]} -gt 0 ]; then
-    echo ""
+    echo "" >&2
     log_fail "Failed tests:"
     for t in "${FAILED_TESTS[@]}"; do
-      echo "  - $t"
+      echo "  - $t" >&2
     done
     return 1
   fi
@@ -373,12 +440,26 @@ run_test_case_compound() {
   TESTS_RUN=$((TESTS_RUN + 1))
   log_info "Running test: $test_name (compound)"
   
+  # Always start from repo root
+  cd "$REPO_ROOT" || exit 1
+  
   local test_dir
   test_dir=$(init_test_fork "$test_name")
   
-  cd "$test_dir" || exit
-  apply_scenario "$scenario1"
-  apply_scenario "$scenario2"
+  # Validate the captured path
+  if [[ ! "$test_dir" =~ ^/ ]] || [[ ! -d "$test_dir" ]]; then
+    log_fail "$test_name: init_test_fork returned invalid path: '$test_dir'"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    FAILED_TESTS+=("$test_name")
+    return
+  fi
+  
+  cd "$test_dir" || exit 1
+  apply_scenario "$scenario1" "$test_dir"
+  apply_scenario "$scenario2" "$test_dir"
+  
+  # Return to repo root
+  cd "$REPO_ROOT" || exit 1
   
   local exit_code
   exit_code=$(run_upgrade "$test_dir")
@@ -389,7 +470,7 @@ run_test_case_compound() {
   if [ "$expect_success" = "true" ]; then
     if [ "$exit_code" != "0" ]; then
       log_fail "$test_name: Expected success but got exit code $exit_code"
-      cat "$output_file" | head -20
+      head -20 "$output_file" >&2
       test_passed=false
     fi
   else
@@ -442,48 +523,64 @@ run_test_case_compound() {
     FAILED_TESTS+=("$test_name")
   fi
   
+  # Return to repo root BEFORE cleanup
+  cd "$REPO_ROOT" || exit 1
   rm -rf "$test_dir"
 }
 
-# Single scenario test
+# Single scenario test (for manual testing)
 run_single_test() {
   local scenario="$1"
   
   log_info "Running single scenario test: $scenario"
+  
+  # Safety check
+  check_host_repo_clean
+  
   mkdir -p "$TEST_WORKDIR"
   
   local test_dir
   test_dir=$(init_test_fork "single-$scenario")
   
-  cd "$test_dir" || exit
-  apply_scenario "$scenario"
+  if [[ ! "$test_dir" =~ ^/ ]] || [[ ! -d "$test_dir" ]]; then
+    log_fail "init_test_fork returned invalid path: '$test_dir'"
+    exit 1
+  fi
+  
+  cd "$test_dir" || exit 1
+  apply_scenario "$scenario" "$test_dir"
   
   log_info "Test fork ready at: $test_dir"
   log_info "Run upgrade manually: cd $test_dir && bash scripts/template-sync.sh"
-  echo ""
+  echo "" >&2
   log_info "Current state:"
-  git status --short
-  echo ""
+  git status --short >&2
+  echo "" >&2
   log_info "Version: $(cat .agile-flow-meta/version 2>/dev/null || echo 'not set')"
+  
+  # Return to repo root
+  cd "$REPO_ROOT" || exit 1
 }
 
 # List available tests
 list_tests() {
-  echo ""
-  echo "Available test scenarios:"
-  echo ""
-  echo "  clean                    — Fresh fork, no changes"
-  echo "  post-bootstrap-product   — Has PRODUCT-*.md files"
-  echo "  modified-agents          — Custom agent guidelines added"
-  echo "  has-overrides            — .agile-flow-overrides configured"
-  echo "  uncommitted-framework    — Dirty framework files (should block)"
-  echo "  uncommitted-userland     — Dirty user content (should allow)"
-  echo "  stale-version            — Old version marker"
-  echo ""
-  echo "Usage:"
-  echo "  bash scripts/test-upgrade-cycle.sh           # Run full test suite"
-  echo "  bash scripts/test-upgrade-cycle.sh <scenario> # Setup single scenario for manual testing"
-  echo ""
+  cat >&2 << 'EOF'
+
+Available test scenarios:
+
+  clean                    — Fresh fork, no changes
+  post-bootstrap-product   — Has PRODUCT-*.md files
+  modified-agents          — Custom agent guidelines added
+  has-overrides            — .agile-flow-overrides configured
+  uncommitted-framework    — Dirty framework files (should block)
+  uncommitted-userland     — Dirty user content (should allow)
+  stale-version            — Old version marker
+
+Usage:
+  bash scripts/test-upgrade-cycle.sh           # Run full test suite
+  bash scripts/test-upgrade-cycle.sh <scenario> # Setup single scenario for manual testing
+
+EOF
 }
 
 # Main

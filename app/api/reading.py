@@ -43,6 +43,7 @@ from app.services.reading.options import (
     PREFERENCE_OPTIONS,
     coerce_value,
     label_for,
+    label_for_key,
     value_for_form,
 )
 from app.services.reading.preferences import upsert_preference
@@ -95,6 +96,7 @@ def read_passage(
             "prefs": prefs,
             "preference_options": PREFERENCE_OPTIONS,
             "label_for": label_for,
+            "label_for_key": label_for_key,
             "value_for_form": value_for_form,
         },
     )

@@ -56,7 +56,7 @@
 
     {% for key, options in preference_options.items() %}
       <fieldset class="reader-control-group" data-pref-key="{{ key }}">
-        <legend>{{ key.replace('_', ' ').title() }}</legend>
+        <legend>{{ label_for_key(key) }}</legend>
         {% for opt in options %}
           <button
             type="button"

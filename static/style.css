@@ -57,10 +57,20 @@
 }
 
 .reader-control-group button[aria-pressed="true"] {
-  /* Show the currently-active option with a clear visual marker.
-     Outline-based so it's distinct from Pico's hover/focus styling. */
-  outline: 2px solid var(--pico-primary);
-  outline-offset: 2px;
+  /* Show the currently-active option with a clear visual marker. Three
+     reinforcing cues so the selected state reads in any browser/theme:
+       1. Box-shadow (more reliably-rendered than outline; survives Pico
+          theme overrides and Safari outline quirks).
+       2. Bold font weight (works even if color rendering is off).
+       3. currentColor for the ring so it contrasts against whatever
+          text color the user has chosen via the fg/bg preferences —
+          avoids the prior bug where --pico-primary blended into the
+          background under some color combinations.
+     The earlier outline-only version was invisible on some screens
+     (likely a combination of --pico-primary not contrasting with the
+     active background + browser outline-rendering differences). */
+  box-shadow: inset 0 0 0 2px currentColor;
+  font-weight: 700;
 }
 
 .todo-list {

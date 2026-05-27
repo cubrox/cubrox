@@ -31,6 +31,14 @@ PREFERENCE_OPTIONS: dict[str, list[Any]] = {
     "bionic_enabled": [True, False],
 }
 
+# Friendly labels for sidebar UI section headings (the <legend> per
+# fieldset). Falls back to the title-cased key with underscores replaced
+# when no entry exists. Used by `label_for_key()` below.
+KEY_LABELS: dict[str, str] = {
+    "bg": "Background",
+    "fg": "Foreground",
+}
+
 # Friendly labels for sidebar UI buttons. Keyed by (preference_key, value).
 # Falls back to str(value) when no entry exists.
 PREFERENCE_LABELS: dict[tuple[str, Any], str] = {
@@ -75,6 +83,17 @@ def label_for(key: str, value: Any) -> str:
     sidebar template to render button text.
     """
     return PREFERENCE_LABELS.get((key, value), str(value))
+
+
+def label_for_key(key: str) -> str:
+    """Return a friendly UI label for a preference key (section heading).
+
+    Falls back to the title-cased key with underscores replaced when no
+    explicit label exists. Used by the sidebar template's <legend> for
+    each fieldset. Examples: `bg` -> "Background", `line_height` ->
+    "Line Height" (via fallback).
+    """
+    return KEY_LABELS.get(key, key.replace("_", " ").title())
 
 
 def value_for_form(value: Any) -> str:

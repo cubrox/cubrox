@@ -31,7 +31,7 @@ if ! gh auth token >/dev/null 2>&1; then
   exit 1
 fi
 
-UPSTREAM_REPO="vibeacademy/agile-flow"
+UPSTREAM_REPO="vibeacademy/gembaflow"
 VERSION_FILE=".agile-flow-version"
 OVERRIDES_FILE=".agile-flow-overrides"
 RUNNING_SCRIPT_REL=$(python3 -c "import os,sys; print(os.path.relpath(os.path.realpath(sys.argv[1]), os.getcwd()))" "$0")

@@ -112,8 +112,8 @@ case "$STACK" in
   python)
     echo "Detected Python project"
     echo ""
-    run_check "ruff check" uv run ruff check .
-    run_check "pytest" uv run pytest --tb=short -q
+    run_check "ruff check" uv run --extra dev ruff check .
+    run_check "pytest" uv run --extra dev pytest --tb=short -q
     ;;
 
   go)

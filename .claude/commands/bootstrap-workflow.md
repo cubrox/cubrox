@@ -275,7 +275,7 @@ Your project is now ready for development!
 5. Review proposed changes
 6. Confirm to apply
 
-When complete, your Agile Flow project is fully operational!
+When complete, your Gemba Flow project is fully operational!
 
 ## Next Steps
 

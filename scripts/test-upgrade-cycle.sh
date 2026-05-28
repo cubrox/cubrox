@@ -74,11 +74,11 @@ init_test_fork() {
   git commit -q -m "Initial fork state" >/dev/null 2>&1 || true
   
   # Set up as downstream fork
-  mkdir -p .agile-flow-meta
-  echo "vibeacademy/agile-flow" > .agile-flow-meta/upstream
-  echo "v1.0.8" > .agile-flow-meta/version  # Start one version behind
+  mkdir -p .gembaflow-meta
+  echo "vibeacademy/gembaflow" > .gembaflow-meta/upstream
+  echo "v1.0.8" > .gembaflow-meta/version  # Start one version behind
   
-  git add .agile-flow-meta >/dev/null 2>&1
+  git add .gembaflow-meta >/dev/null 2>&1
   git commit -q -m "Configure as downstream fork" >/dev/null 2>&1 || true
   
   # Return to repo root before outputting path
@@ -141,12 +141,12 @@ PREOF
       ;;
       
     has-overrides)
-      cat > .agile-flow-overrides << 'OVEOF'
+      cat > .gembaflow-overrides << 'OVEOF'
 # Protected files
 .claude/agents/github-ticket-worker.md
 .claude/commands/work-ticket.md
 OVEOF
-      git add .agile-flow-overrides >/dev/null 2>&1
+      git add .gembaflow-overrides >/dev/null 2>&1
       git commit -q -m "Configure overrides" >/dev/null 2>&1 || true
       ;;
       
@@ -164,8 +164,8 @@ OVEOF
       ;;
       
     stale-version)
-      echo "v0.9.0" > .agile-flow-meta/version
-      git add .agile-flow-meta/version >/dev/null 2>&1
+      echo "v0.9.0" > .gembaflow-meta/version
+      git add .gembaflow-meta/version >/dev/null 2>&1
       git commit -q -m "Set stale version" >/dev/null 2>&1 || true
       ;;
       
@@ -225,8 +225,8 @@ check_version_updated() {
   # and that it looks like a valid version tag
   local actual_version
   
-  if [ -f "$test_dir/.agile-flow-meta/version" ]; then
-    actual_version=$(cat "$test_dir/.agile-flow-meta/version")
+  if [ -f "$test_dir/.gembaflow-meta/version" ]; then
+    actual_version=$(cat "$test_dir/.gembaflow-meta/version")
     # Version should be updated from starting v1.0.8 and match vX.Y.Z pattern
     if [ "$actual_version" != "v1.0.8" ] && [[ "$actual_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
       return 0
@@ -240,7 +240,7 @@ check_overrides_preserved() {
   local override_file="$2"
   
   # If override was configured and file exists, check it wasn't overwritten
-  if [ -f "$test_dir/.agile-flow-overrides" ] && [ -f "$test_dir/$override_file" ]; then
+  if [ -f "$test_dir/.gembaflow-overrides" ] && [ -f "$test_dir/$override_file" ]; then
     # Check if custom content still exists
     grep -q "Custom Team Guidelines" "$test_dir/$override_file" 2>/dev/null
   else
@@ -556,7 +556,7 @@ run_single_test() {
   log_info "Current state:"
   git status --short >&2
   echo "" >&2
-  log_info "Version: $(cat .agile-flow-meta/version 2>/dev/null || echo 'not set')"
+  log_info "Version: $(cat .gembaflow-meta/version 2>/dev/null || echo 'not set')"
   
   # Return to repo root
   cd "$REPO_ROOT" || exit 1
@@ -571,7 +571,7 @@ Available test scenarios:
   clean                    — Fresh fork, no changes
   post-bootstrap-product   — Has PRODUCT-*.md files
   modified-agents          — Custom agent guidelines added
-  has-overrides            — .agile-flow-overrides configured
+  has-overrides            — .gembaflow-overrides configured
   uncommitted-framework    — Dirty framework files (should block)
   uncommitted-userland     — Dirty user content (should allow)
   stale-version            — Old version marker

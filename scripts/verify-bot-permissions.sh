@@ -255,7 +255,9 @@ test_required_status_checks() {
     fi
 
     if [ -n "$checks" ]; then
-        local expected_checks="lint typecheck build test"
+        # `version-parity` was previously named `typecheck` (renamed in #361
+        # because the job runs JSON + version-parity validation, not `tsc`).
+        local expected_checks="lint version-parity build test"
         local missing=""
 
         for check in $expected_checks; do
@@ -265,7 +267,7 @@ test_required_status_checks() {
         done
 
         if [ -z "$missing" ]; then
-            pass "All required status checks configured (lint, typecheck, build, test)"
+            pass "All required status checks configured (lint, version-parity, build, test)"
         else
             fail "Missing required status checks:$missing"
         fi

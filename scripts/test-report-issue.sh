@@ -54,9 +54,9 @@ echo "Acceptance Tests: report-issue.sh"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# ── Test 1: Missing .agile-flow-meta directory ────────────────────────────────
+# ── Test 1: Missing .gembaflow-meta directory ────────────────────────────────
 
-echo "Test 1: Error when .agile-flow-meta directory is missing"
+echo "Test 1: Error when .gembaflow-meta directory is missing"
 
 TEST_DIR="$WORK_DIR/test1"
 mkdir -p "$TEST_DIR"
@@ -64,12 +64,12 @@ pushd "$TEST_DIR" >/dev/null
 git init --quiet
 
 if bash "$REPO_ROOT/scripts/report-issue.sh" --non-interactive --severity p1 --component docs --title "test" > "$WORK_DIR/test1.log" 2>&1; then
-  fail "should exit non-zero when .agile-flow-meta is missing"
+  fail "should exit non-zero when .gembaflow-meta is missing"
 else
-  if grep -q ".agile-flow-meta/ directory not found" "$WORK_DIR/test1.log"; then
-    pass "error message mentions missing .agile-flow-meta/"
+  if grep -q ".gembaflow-meta/ directory not found" "$WORK_DIR/test1.log"; then
+    pass "error message mentions missing .gembaflow-meta/"
   else
-    fail "expected error message about missing .agile-flow-meta/"
+    fail "expected error message about missing .gembaflow-meta/"
     cat "$WORK_DIR/test1.log"
   fi
   
@@ -85,10 +85,10 @@ echo ""
 
 # ── Test 2: Missing upstream file ─────────────────────────────────────────────
 
-echo "Test 2: Error when .agile-flow-meta/upstream is missing"
+echo "Test 2: Error when .gembaflow-meta/upstream is missing"
 
 TEST_DIR="$WORK_DIR/test2"
-mkdir -p "$TEST_DIR/.agile-flow-meta"
+mkdir -p "$TEST_DIR/.gembaflow-meta"
 pushd "$TEST_DIR" >/dev/null
 git init --quiet
 
@@ -108,11 +108,11 @@ echo ""
 
 # ── Test 3: Empty upstream file ───────────────────────────────────────────────
 
-echo "Test 3: Error when .agile-flow-meta/upstream is empty"
+echo "Test 3: Error when .gembaflow-meta/upstream is empty"
 
 TEST_DIR="$WORK_DIR/test3"
-mkdir -p "$TEST_DIR/.agile-flow-meta"
-echo "" > "$TEST_DIR/.agile-flow-meta/upstream"
+mkdir -p "$TEST_DIR/.gembaflow-meta"
+echo "" > "$TEST_DIR/.gembaflow-meta/upstream"
 pushd "$TEST_DIR" >/dev/null
 git init --quiet
 
@@ -135,8 +135,8 @@ echo ""
 echo "Test 4: Error on invalid severity value"
 
 TEST_DIR="$WORK_DIR/test4"
-mkdir -p "$TEST_DIR/.agile-flow-meta"
-echo "https://github.com/vibeacademy/agile-flow" > "$TEST_DIR/.agile-flow-meta/upstream"
+mkdir -p "$TEST_DIR/.gembaflow-meta"
+echo "https://github.com/vibeacademy/gembaflow" > "$TEST_DIR/.gembaflow-meta/upstream"
 pushd "$TEST_DIR" >/dev/null
 git init --quiet
 git commit --allow-empty -m "init" --quiet
@@ -160,8 +160,8 @@ echo ""
 echo "Test 5: Error on invalid component value"
 
 TEST_DIR="$WORK_DIR/test5"
-mkdir -p "$TEST_DIR/.agile-flow-meta"
-echo "https://github.com/vibeacademy/agile-flow" > "$TEST_DIR/.agile-flow-meta/upstream"
+mkdir -p "$TEST_DIR/.gembaflow-meta"
+echo "https://github.com/vibeacademy/gembaflow" > "$TEST_DIR/.gembaflow-meta/upstream"
 pushd "$TEST_DIR" >/dev/null
 git init --quiet
 git commit --allow-empty -m "init" --quiet
@@ -185,8 +185,8 @@ echo ""
 echo "Test 6: Error when title is empty"
 
 TEST_DIR="$WORK_DIR/test6"
-mkdir -p "$TEST_DIR/.agile-flow-meta"
-echo "https://github.com/vibeacademy/agile-flow" > "$TEST_DIR/.agile-flow-meta/upstream"
+mkdir -p "$TEST_DIR/.gembaflow-meta"
+echo "https://github.com/vibeacademy/gembaflow" > "$TEST_DIR/.gembaflow-meta/upstream"
 pushd "$TEST_DIR" >/dev/null
 git init --quiet
 git commit --allow-empty -m "init" --quiet
@@ -212,9 +212,9 @@ echo ""
 echo "Test 7: Fallback to manual submission when gh CLI unavailable"
 
 TEST_DIR="$WORK_DIR/test7"
-mkdir -p "$TEST_DIR/.agile-flow-meta"
-echo "https://github.com/vibeacademy/agile-flow" > "$TEST_DIR/.agile-flow-meta/upstream"
-echo "1.0.0" > "$TEST_DIR/.agile-flow-meta/version"
+mkdir -p "$TEST_DIR/.gembaflow-meta"
+echo "https://github.com/vibeacademy/gembaflow" > "$TEST_DIR/.gembaflow-meta/upstream"
+echo "1.0.0" > "$TEST_DIR/.gembaflow-meta/version"
 pushd "$TEST_DIR" >/dev/null
 git init --quiet
 git commit --allow-empty -m "init" --quiet
@@ -237,7 +237,7 @@ if PATH="$WORK_DIR/nogh-bin:$PATH" bash "$REPO_ROOT/scripts/report-issue.sh" --n
     cat "$WORK_DIR/test7.log"
   fi
   
-  if grep -q "github.com/vibeacademy/agile-flow/issues/new" "$WORK_DIR/test7.log"; then
+  if grep -q "github.com/vibeacademy/gembaflow/issues/new" "$WORK_DIR/test7.log"; then
     pass "pre-filled GitHub issue URL is provided"
   else
     fail "expected pre-filled GitHub issue URL"
@@ -245,10 +245,10 @@ if PATH="$WORK_DIR/nogh-bin:$PATH" bash "$REPO_ROOT/scripts/report-issue.sh" --n
   fi
   
   # Check report file was created
-  if find "$TEST_DIR/.agile-flow-meta/reports/" -name "report-*.md" -type f 2>/dev/null | grep -q .; then
-    pass "report file saved to .agile-flow-meta/reports/"
+  if find "$TEST_DIR/.gembaflow-meta/reports/" -name "report-*.md" -type f 2>/dev/null | grep -q .; then
+    pass "report file saved to .gembaflow-meta/reports/"
     
-    REPORT_FILE=$(find "$TEST_DIR/.agile-flow-meta/reports/" -name "report-*.md" -type f 2>/dev/null | head -1)
+    REPORT_FILE=$(find "$TEST_DIR/.gembaflow-meta/reports/" -name "report-*.md" -type f 2>/dev/null | head -1)
     if grep -q "severity: p2" "$REPORT_FILE"; then
       pass "report file contains correct severity"
     else
@@ -260,7 +260,7 @@ if PATH="$WORK_DIR/nogh-bin:$PATH" bash "$REPO_ROOT/scripts/report-issue.sh" --n
       fail "report file missing component"
     fi
   else
-    fail "no report file created in .agile-flow-meta/reports/"
+    fail "no report file created in .gembaflow-meta/reports/"
   fi
 else
   fail "fallback mode should exit 0"
@@ -275,9 +275,9 @@ echo ""
 echo "Test 8: Happy path with successful gh issue create"
 
 TEST_DIR="$WORK_DIR/test8"
-mkdir -p "$TEST_DIR/.agile-flow-meta"
-echo "https://github.com/vibeacademy/agile-flow" > "$TEST_DIR/.agile-flow-meta/upstream"
-echo "1.0.0" > "$TEST_DIR/.agile-flow-meta/version"
+mkdir -p "$TEST_DIR/.gembaflow-meta"
+echo "https://github.com/vibeacademy/gembaflow" > "$TEST_DIR/.gembaflow-meta/upstream"
+echo "1.0.0" > "$TEST_DIR/.gembaflow-meta/version"
 pushd "$TEST_DIR" >/dev/null
 git init --quiet
 git commit --allow-empty -m "init" --quiet
@@ -288,7 +288,7 @@ cat > "$WORK_DIR/mock-gh-bin/gh" <<'SH'
 #!/usr/bin/env bash
 # Mock gh issue create
 if [[ "${1:-}" == "issue" && "${2:-}" == "create" ]]; then
-  echo "https://github.com/vibeacademy/agile-flow/issues/999"
+  echo "https://github.com/vibeacademy/gembaflow/issues/999"
   exit 0
 fi
 exit 1
@@ -304,10 +304,10 @@ if PATH="$WORK_DIR/mock-gh-bin:$PATH" bash "$REPO_ROOT/scripts/report-issue.sh" 
   fi
   
   # Check report file was created
-  if find "$TEST_DIR/.agile-flow-meta/reports/" -name "report-*.md" -type f 2>/dev/null | grep -q .; then
+  if find "$TEST_DIR/.gembaflow-meta/reports/" -name "report-*.md" -type f 2>/dev/null | grep -q .; then
     pass "report file saved even on success"
     
-    REPORT_FILE=$(find "$TEST_DIR/.agile-flow-meta/reports/" -name "report-*.md" -type f 2>/dev/null | head -1)
+    REPORT_FILE=$(find "$TEST_DIR/.gembaflow-meta/reports/" -name "report-*.md" -type f 2>/dev/null | head -1)
     if grep -q 'title: "Happy path test"' "$REPORT_FILE"; then
       pass "report file contains correct title"
     else
@@ -319,7 +319,7 @@ if PATH="$WORK_DIR/mock-gh-bin:$PATH" bash "$REPO_ROOT/scripts/report-issue.sh" 
       info "downstream-report label check inconclusive"
     fi
   else
-    fail "no report file created in .agile-flow-meta/reports/"
+    fail "no report file created in .gembaflow-meta/reports/"
   fi
 else
   fail "happy path should exit 0"
@@ -334,8 +334,8 @@ echo ""
 echo "Test 9: Error on unknown flag"
 
 TEST_DIR="$WORK_DIR/test9"
-mkdir -p "$TEST_DIR/.agile-flow-meta"
-echo "https://github.com/vibeacademy/agile-flow" > "$TEST_DIR/.agile-flow-meta/upstream"
+mkdir -p "$TEST_DIR/.gembaflow-meta"
+echo "https://github.com/vibeacademy/gembaflow" > "$TEST_DIR/.gembaflow-meta/upstream"
 pushd "$TEST_DIR" >/dev/null
 git init --quiet
 
@@ -359,8 +359,8 @@ echo ""
 echo "Test 10: Non-interactive mode requires --severity"
 
 TEST_DIR="$WORK_DIR/test10"
-mkdir -p "$TEST_DIR/.agile-flow-meta"
-echo "https://github.com/vibeacademy/agile-flow" > "$TEST_DIR/.agile-flow-meta/upstream"
+mkdir -p "$TEST_DIR/.gembaflow-meta"
+echo "https://github.com/vibeacademy/gembaflow" > "$TEST_DIR/.gembaflow-meta/upstream"
 pushd "$TEST_DIR" >/dev/null
 git init --quiet
 git commit --allow-empty -m "init" --quiet
@@ -384,16 +384,16 @@ echo ""
 echo "Test 11: Parse git@ format upstream URL"
 
 TEST_DIR="$WORK_DIR/test11"
-mkdir -p "$TEST_DIR/.agile-flow-meta"
-echo "git@github.com:vibeacademy/agile-flow.git" > "$TEST_DIR/.agile-flow-meta/upstream"
-echo "1.0.0" > "$TEST_DIR/.agile-flow-meta/version"
+mkdir -p "$TEST_DIR/.gembaflow-meta"
+echo "git@github.com:vibeacademy/gembaflow.git" > "$TEST_DIR/.gembaflow-meta/upstream"
+echo "1.0.0" > "$TEST_DIR/.gembaflow-meta/version"
 pushd "$TEST_DIR" >/dev/null
 git init --quiet
 git commit --allow-empty -m "init" --quiet
 
 # Use mock gh
 if PATH="$WORK_DIR/mock-gh-bin:$PATH" bash "$REPO_ROOT/scripts/report-issue.sh" --non-interactive --severity p3 --component docs --title "SSH URL test" > "$WORK_DIR/test11.log" 2>&1; then
-  if grep -q "vibeacademy/agile-flow" "$WORK_DIR/test11.log"; then
+  if grep -q "vibeacademy/gembaflow" "$WORK_DIR/test11.log"; then
     pass "git@ URL parsed to correct repo"
   else
     fail "git@ URL not parsed correctly"
@@ -412,9 +412,9 @@ echo ""
 echo "Test 12: Handle title with special characters"
 
 TEST_DIR="$WORK_DIR/test12"
-mkdir -p "$TEST_DIR/.agile-flow-meta"
-echo "https://github.com/vibeacademy/agile-flow" > "$TEST_DIR/.agile-flow-meta/upstream"
-echo "1.0.0" > "$TEST_DIR/.agile-flow-meta/version"
+mkdir -p "$TEST_DIR/.gembaflow-meta"
+echo "https://github.com/vibeacademy/gembaflow" > "$TEST_DIR/.gembaflow-meta/upstream"
+echo "1.0.0" > "$TEST_DIR/.gembaflow-meta/version"
 pushd "$TEST_DIR" >/dev/null
 git init --quiet
 git commit --allow-empty -m "init" --quiet
@@ -422,7 +422,7 @@ git commit --allow-empty -m "init" --quiet
 SPECIAL_TITLE='Fix "quotes" and backslash \\ issue'
 
 if PATH="$WORK_DIR/mock-gh-bin:$PATH" bash "$REPO_ROOT/scripts/report-issue.sh" --non-interactive --severity p3 --component docs --title "$SPECIAL_TITLE" > "$WORK_DIR/test12.log" 2>&1; then
-  REPORT_FILE=$(find "$TEST_DIR/.agile-flow-meta/reports/" -name "report-*.md" -type f 2>/dev/null | head -1)
+  REPORT_FILE=$(find "$TEST_DIR/.gembaflow-meta/reports/" -name "report-*.md" -type f 2>/dev/null | head -1)
   if [ -f "$REPORT_FILE" ]; then
     pass "report file created with special characters in title"
     # Check the YAML frontmatter contains escaped quotes

@@ -15,8 +15,16 @@
 
 set -euo pipefail
 
-WORKER_ACCOUNT="${AGILE_FLOW_WORKER_ACCOUNT:-va-worker}"
-REVIEWER_ACCOUNT="${AGILE_FLOW_REVIEWER_ACCOUNT:-va-reviewer}"
+# Dual-read shim for the agile-flow → Gemba Flow env-var rebrand.
+# Prefers GEMBAFLOW_*, falls back to the deprecated AGILE_FLOW_*.
+# See scripts/lib/env-compat.sh for the migration policy.
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${HOOK_DIR}/../.." && pwd)"
+# shellcheck source=../../scripts/lib/env-compat.sh
+source "${REPO_ROOT}/scripts/lib/env-compat.sh"
+
+WORKER_ACCOUNT="$(gf_worker_account)"
+REVIEWER_ACCOUNT="$(gf_reviewer_account)"
 
 # Read JSON input from stdin
 input=$(cat)

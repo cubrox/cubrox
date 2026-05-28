@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# report-issue.sh — Report a downstream issue to the upstream Agile Flow repo.
+# report-issue.sh — Report a downstream issue to the upstream Gemba Flow repo.
 #
 # Usage:
 #   bash scripts/report-issue.sh
@@ -15,8 +15,8 @@
 
 set -euo pipefail
 
-VERSION_FILE=".agile-flow-version"
-REPORTS_DIR=".agile-flow-reports"
+VERSION_FILE=".gembaflow-version"
+REPORTS_DIR=".gembaflow-reports"
 
 # ── Parse flags ───────────────────────────────────────────────────────────────
 
@@ -31,7 +31,7 @@ DRY_RUN=false
 
 show_help() {
   cat <<'HELP'
-report-issue.sh — Report a downstream issue to the upstream Agile Flow repo.
+report-issue.sh — Report a downstream issue to the upstream Gemba Flow repo.
 
 Usage:
   bash scripts/report-issue.sh [FLAGS]
@@ -107,24 +107,24 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ── Verify .agile-flow-version exists ──────────────────────────────────────────
+# ── Verify the version manifest exists ────────────────────────────────────────
 
 if [ ! -f "$VERSION_FILE" ]; then
-  echo "ERROR: .agile-flow-version file not found." >&2
+  echo "ERROR: .gembaflow-version file not found." >&2
   echo "This fork does not have upstream metadata. Run /upgrade to initialise." >&2
   exit 1
 fi
 
-# ── Read upstream URL and version from .agile-flow-version ────────────────────
+# ── Read upstream URL and version from the manifest ──────────────────────────
 
 if ! command -v jq >/dev/null 2>&1; then
-  echo "ERROR: jq is required to parse .agile-flow-version but is not installed." >&2
+  echo "ERROR: jq is required to parse $VERSION_FILE but is not installed." >&2
   exit 1
 fi
 
 UPSTREAM_URL=$(jq -r '.upstream' "$VERSION_FILE" 2>/dev/null || echo "null")
 if [ "$UPSTREAM_URL" = "null" ] || [ -z "$UPSTREAM_URL" ]; then
-  echo "ERROR: .agile-flow-version does not contain 'upstream' field." >&2
+  echo "ERROR: $VERSION_FILE does not contain 'upstream' field." >&2
   echo "Run /upgrade to record this fork's upstream URL." >&2
   exit 1
 fi

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Agile Flow Doctor — Local Diagnostic Script
+# Gemba Flow Doctor — Local Diagnostic Script
 #
 # Validates the full configuration needed for the workshop:
 #   CLI tools, git config, GitHub auth, MCP config, Claude settings,
@@ -24,6 +24,13 @@ set -uo pipefail
 if [ -z "$BASH_VERSION" ]; then
     exec bash "$0" "$@"
 fi
+
+# Dual-read shim for the agile-flow → Gemba Flow env-var rebrand.
+# Prefers GEMBAFLOW_*, falls back to the deprecated AGILE_FLOW_*.
+# See scripts/lib/env-compat.sh for the migration policy.
+DOCTOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/env-compat.sh
+source "${DOCTOR_DIR}/lib/env-compat.sh"
 
 # ───────────────────────────────────────────────────────────────────
 #  Colors
@@ -114,7 +121,7 @@ resolve_cmd() {
 # ───────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║${NC}              ${BLUE}Agile Flow Doctor${NC}                              ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}              ${BLUE}Gemba Flow Doctor${NC}                              ${CYAN}║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -131,35 +138,37 @@ fi
 # ═══════════════════════════════════════════════════════════════════
 section "Framework Version"
 
-if [ -f ".agile-flow-version" ]; then
+VERSION_MANIFEST=".gembaflow-version"
+
+if [ -f "$VERSION_MANIFEST" ]; then
     if JQ_CMD=$(resolve_cmd jq); then
-        local_version=$("$JQ_CMD" -r '.version' .agile-flow-version 2>/dev/null || echo "")
+        local_version=$("$JQ_CMD" -r '.version' "$VERSION_MANIFEST" 2>/dev/null || echo "")
         if [ -n "$local_version" ]; then
             # Fetch latest release from GitHub
-            latest_json=$(curl -s --max-time 5 https://api.github.com/repos/vibeacademy/agile-flow/releases/latest 2>/dev/null || echo "")
+            latest_json=$(curl -s --max-time 5 https://api.github.com/repos/vibeacademy/gembaflow/releases/latest 2>/dev/null || echo "")
             if [ -n "$latest_json" ]; then
                 latest_version=$(echo "$latest_json" | "$JQ_CMD" -r '.tag_name // empty' 2>/dev/null | sed 's/^v//')
                 release_url=$(echo "$latest_json" | "$JQ_CMD" -r '.html_url // empty' 2>/dev/null)
                 if [ -n "$latest_version" ]; then
                     if [ "$local_version" = "$latest_version" ]; then
-                        pass "Framework Version" "Agile Flow v${local_version} (up to date)"
+                        pass "Framework Version" "Gemba Flow v${local_version} (up to date)"
                     else
-                        warn "Framework Version" "Agile Flow v${local_version} (update available: v${latest_version})" "${release_url}"
+                        warn "Framework Version" "Gemba Flow v${local_version} (update available: v${latest_version})" "${release_url}"
                     fi
                 else
-                    warn "Framework Version" "Agile Flow v${local_version} (could not check for updates)" "GitHub API returned unexpected response"
+                    warn "Framework Version" "Gemba Flow v${local_version} (could not check for updates)" "GitHub API returned unexpected response"
                 fi
             else
-                warn "Framework Version" "Agile Flow v${local_version} (could not check for updates)" "GitHub API unreachable"
+                warn "Framework Version" "Gemba Flow v${local_version} (could not check for updates)" "GitHub API unreachable"
             fi
         else
-            warn "Framework Version" "Version manifest unreadable" "Check .agile-flow-version format"
+            warn "Framework Version" "Version manifest unreadable" "Check $VERSION_MANIFEST format"
         fi
     else
         skip "Framework Version" "Version check" "jq not installed"
     fi
 else
-    warn "Framework Version" "Version manifest not found" "Run bootstrap.sh to create .agile-flow-version"
+    warn "Framework Version" "Version manifest not found" "Run bootstrap.sh to create .gembaflow-version"
 fi
 
 # ═══════════════════════════════════════════════════════════════════
@@ -292,40 +301,54 @@ else
     fail "GitHub Auth" "Not authenticated with gh" "Run: gh auth login"
 fi
 
-# AGILE_FLOW_WORKER_ACCOUNT (WARN)
-if [ -n "${AGILE_FLOW_WORKER_ACCOUNT:-}" ]; then
-    pass "GitHub Auth" "AGILE_FLOW_WORKER_ACCOUNT set: $AGILE_FLOW_WORKER_ACCOUNT"
+# Worker account env var (WARN) — dual-read GEMBAFLOW_* / AGILE_FLOW_*
+DOCTOR_WORKER_ACCOUNT="$(gf_env GEMBAFLOW_WORKER_ACCOUNT AGILE_FLOW_WORKER_ACCOUNT)"
+DOCTOR_WORKER_SRC="$(gf_env_source_label GEMBAFLOW_WORKER_ACCOUNT AGILE_FLOW_WORKER_ACCOUNT)"
+if [ -n "$DOCTOR_WORKER_ACCOUNT" ]; then
+    pass "GitHub Auth" "Worker account env set (${DOCTOR_WORKER_SRC}): $DOCTOR_WORKER_ACCOUNT"
 
     # Test worker account is in keyring
-    if "$GH_CMD" auth switch --user "$AGILE_FLOW_WORKER_ACCOUNT" &>/dev/null 2>&1; then
-        pass "GitHub Auth" "Worker account ($AGILE_FLOW_WORKER_ACCOUNT) in gh keyring"
+    if "$GH_CMD" auth switch --user "$DOCTOR_WORKER_ACCOUNT" &>/dev/null 2>&1; then
+        pass "GitHub Auth" "Worker account ($DOCTOR_WORKER_ACCOUNT) in gh keyring"
         # Restore original user
         if [ -n "$ORIGINAL_GH_USER" ]; then
             "$GH_CMD" auth switch --user "$ORIGINAL_GH_USER" &>/dev/null 2>&1 || true
         fi
     else
-        warn "GitHub Auth" "Worker account ($AGILE_FLOW_WORKER_ACCOUNT) not in gh keyring" "Run: gh auth login for this account"
+        warn "GitHub Auth" "Worker account ($DOCTOR_WORKER_ACCOUNT) not in gh keyring" "Run: gh auth login for this account"
+    fi
+
+    # Nudge users still on the deprecated name to migrate.
+    if [ -z "${GEMBAFLOW_WORKER_ACCOUNT:-}" ] && [ -n "${AGILE_FLOW_WORKER_ACCOUNT:-}" ]; then
+        warn "GitHub Auth" "AGILE_FLOW_WORKER_ACCOUNT is deprecated" "Rename to GEMBAFLOW_WORKER_ACCOUNT in your shell rc"
     fi
 else
-    warn "GitHub Auth" "AGILE_FLOW_WORKER_ACCOUNT not set" "export AGILE_FLOW_WORKER_ACCOUNT=\"{org}-worker\""
+    warn "GitHub Auth" "GEMBAFLOW_WORKER_ACCOUNT not set" "export GEMBAFLOW_WORKER_ACCOUNT=\"{org}-worker\""
 fi
 
-# AGILE_FLOW_REVIEWER_ACCOUNT (WARN)
-if [ -n "${AGILE_FLOW_REVIEWER_ACCOUNT:-}" ]; then
-    pass "GitHub Auth" "AGILE_FLOW_REVIEWER_ACCOUNT set: $AGILE_FLOW_REVIEWER_ACCOUNT"
+# Reviewer account env var (WARN) — dual-read GEMBAFLOW_* / AGILE_FLOW_*
+DOCTOR_REVIEWER_ACCOUNT="$(gf_env GEMBAFLOW_REVIEWER_ACCOUNT AGILE_FLOW_REVIEWER_ACCOUNT)"
+DOCTOR_REVIEWER_SRC="$(gf_env_source_label GEMBAFLOW_REVIEWER_ACCOUNT AGILE_FLOW_REVIEWER_ACCOUNT)"
+if [ -n "$DOCTOR_REVIEWER_ACCOUNT" ]; then
+    pass "GitHub Auth" "Reviewer account env set (${DOCTOR_REVIEWER_SRC}): $DOCTOR_REVIEWER_ACCOUNT"
 
     # Test reviewer account is in keyring
-    if "$GH_CMD" auth switch --user "$AGILE_FLOW_REVIEWER_ACCOUNT" &>/dev/null 2>&1; then
-        pass "GitHub Auth" "Reviewer account ($AGILE_FLOW_REVIEWER_ACCOUNT) in gh keyring"
+    if "$GH_CMD" auth switch --user "$DOCTOR_REVIEWER_ACCOUNT" &>/dev/null 2>&1; then
+        pass "GitHub Auth" "Reviewer account ($DOCTOR_REVIEWER_ACCOUNT) in gh keyring"
         # Restore original user
         if [ -n "$ORIGINAL_GH_USER" ]; then
             "$GH_CMD" auth switch --user "$ORIGINAL_GH_USER" &>/dev/null 2>&1 || true
         fi
     else
-        warn "GitHub Auth" "Reviewer account ($AGILE_FLOW_REVIEWER_ACCOUNT) not in gh keyring" "Run: gh auth login for this account"
+        warn "GitHub Auth" "Reviewer account ($DOCTOR_REVIEWER_ACCOUNT) not in gh keyring" "Run: gh auth login for this account"
+    fi
+
+    # Nudge users still on the deprecated name to migrate.
+    if [ -z "${GEMBAFLOW_REVIEWER_ACCOUNT:-}" ] && [ -n "${AGILE_FLOW_REVIEWER_ACCOUNT:-}" ]; then
+        warn "GitHub Auth" "AGILE_FLOW_REVIEWER_ACCOUNT is deprecated" "Rename to GEMBAFLOW_REVIEWER_ACCOUNT in your shell rc"
     fi
 else
-    warn "GitHub Auth" "AGILE_FLOW_REVIEWER_ACCOUNT not set" "export AGILE_FLOW_REVIEWER_ACCOUNT=\"{org}-reviewer\""
+    warn "GitHub Auth" "GEMBAFLOW_REVIEWER_ACCOUNT not set" "export GEMBAFLOW_REVIEWER_ACCOUNT=\"{org}-reviewer\""
 fi
 
 # Final restore — ensure we always end on the original user

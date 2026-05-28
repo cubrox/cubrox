@@ -1,10 +1,10 @@
 ---
-description: "Report a bug or issue from this fork back to the upstream Agile Flow repo"
+description: "Report a bug or issue from this fork back to the upstream Gemba Flow repo"
 ---
 
 # /report-issue — Report an Issue to Upstream
 
-File a structured bug report or feedback item against the upstream Agile Flow repo
+File a structured bug report or feedback item against the upstream Gemba Flow repo
 from this downstream fork. The report is delivered as a GitHub issue with a
 `downstream-report` label so upstream maintainers can triage it automatically.
 
@@ -21,7 +21,7 @@ issues you own). Use it for problems that exist in the upstream framework files.
 
 ## Instructions
 
-1. **Verify `.agile-flow-version` exists**. If the file is missing, run `/upgrade`
+1. **Verify `.gembaflow-version` exists**. If the file is missing, run `/upgrade`
    first to initialise the metadata file.
 
 2. **Gather context before running the script**. Before invoking, note:
@@ -39,7 +39,7 @@ issues you own). Use it for problems that exist in the upstream framework files.
    ```
 
    The script will:
-   - Read .agile-flow-version to identify the target repo and version
+   - Read .gembaflow-version to identify the target repo and version
    - Capture fork_commit (current HEAD) and upstream_version automatically
    - Prompt for severity, component, and title
    - Open your $EDITOR (or use inline input) for the description
@@ -63,7 +63,7 @@ issues you own). Use it for problems that exist in the upstream framework files.
 
 7. **If gh access is denied** (fallback path):
 
-   The script will save the report to .agile-flow-reports/report-<timestamp>.md,
+   The script will save the report to .gembaflow-reports/report-<timestamp>.md,
    copy the body to clipboard if available, and print a pre-filled GitHub issue URL.
 
    Tell the user:
@@ -82,12 +82,12 @@ bash scripts/report-issue.sh \
 
 ## Report format reference
 
-The script generates a YAML front-matter Markdown file in .agile-flow-reports/:
+The script generates a YAML front-matter Markdown file in .gembaflow-reports/:
 
 ```
 ---
 agile_flow_report: true
-upstream: https://github.com/vibeacademy/agile-flow
+upstream: https://github.com/vibeacademy/gembaflow
 fork_commit: abc123def456...
 upstream_version: v2.1.0 @ def789abc012
 severity: p2
@@ -96,7 +96,7 @@ title: "Provision script fails when roster has special characters"
 ---
 ```
 
-The upstream field is read automatically from .agile-flow-version.
+The upstream field is read automatically from .gembaflow-version.
 
 ## Output Format
 
@@ -106,10 +106,10 @@ End your response with a Result Block:
 ---
 
 **Result:** Issue filed
-URL: https://github.com/vibeacademy/agile-flow/issues/42
+URL: https://github.com/vibeacademy/gembaflow/issues/42
 Severity: p2
 Component: provisioning
-Report: .agile-flow-reports/report-20260508-143022.md
+Report: .gembaflow-reports/report-20260508-143022.md
 ```
 
 Or if fallback was used:
@@ -118,8 +118,8 @@ Or if fallback was used:
 ---
 
 **Result:** Report saved (manual submission required)
-Report: .agile-flow-reports/report-20260508-143022.md
-Browser URL: https://github.com/vibeacademy/agile-flow/issues/new?...
+Report: .gembaflow-reports/report-20260508-143022.md
+Browser URL: https://github.com/vibeacademy/gembaflow/issues/new?...
 ```
 
 Or on error:
@@ -128,5 +128,5 @@ Or on error:
 ---
 
 **Result:** Error
-Reason: .agile-flow-version not found - run /upgrade first
+Reason: .gembaflow-version not found - run /upgrade first
 ```

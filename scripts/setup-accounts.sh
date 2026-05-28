@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Agile Flow Account Setup
+# Gemba Flow Account Setup
 #
 # Streamlined setup for the three-account GitHub configuration.
 # Paste your PATs → done. No interactive gh prompts.
@@ -19,6 +19,18 @@ set -uo pipefail
 if [ -z "$BASH_VERSION" ]; then
     exec bash "$0" "$@"
 fi
+
+# Dual-read shim for the agile-flow → Gemba Flow env-var rebrand.
+# Prefers GEMBAFLOW_*, falls back to the deprecated AGILE_FLOW_*.
+# See scripts/lib/env-compat.sh for the migration policy.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/env-compat.sh
+source "${SCRIPT_DIR}/lib/env-compat.sh"
+
+# Resolved values from the dual-read shim. Captured once at script start
+# so the deprecation warning (if any) fires at most once per invocation.
+SETUP_WORKER_ACCOUNT="$(gf_env GEMBAFLOW_WORKER_ACCOUNT AGILE_FLOW_WORKER_ACCOUNT)"
+SETUP_REVIEWER_ACCOUNT="$(gf_env GEMBAFLOW_REVIEWER_ACCOUNT AGILE_FLOW_REVIEWER_ACCOUNT)"
 
 # ───────────────────────────────────────────────────────────────────
 #  Colors (from doctor.sh)
@@ -99,7 +111,7 @@ persist_env_var() {
     else
         {
             echo ""
-            echo "# Added by Agile Flow setup-accounts"
+            echo "# Added by Gemba Flow setup-accounts"
             echo "export ${var_name}=\"${var_value}\""
         } >> "$profile"
         print_info "Added ${var_name} to ${profile}"
@@ -124,7 +136,7 @@ trap restore_personal EXIT
 # ═══════════════════════════════════════════════════════════════════
 
 echo ""
-echo -e "${CYAN}━━━ Agile Flow Account Setup ━━━${NC}"
+echo -e "${CYAN}━━━ Gemba Flow Account Setup ━━━${NC}"
 echo ""
 
 # ───────────────────────────────────────────────────────────────────
@@ -171,7 +183,7 @@ worker_account="${org_prefix}-worker"
 reviewer_account="${org_prefix}-reviewer"
 
 # Check if worker already configured and matches
-if [ -n "${AGILE_FLOW_WORKER_ACCOUNT:-}" ] && [ "$AGILE_FLOW_WORKER_ACCOUNT" = "$worker_account" ]; then
+if [ -n "${SETUP_WORKER_ACCOUNT:-}" ] && [ "$SETUP_WORKER_ACCOUNT" = "$worker_account" ]; then
     # Verify it's actually in the keyring
     if gh auth switch --user "$worker_account" &>/dev/null 2>&1; then
         print_success "Worker account already configured: ${worker_account}"
@@ -179,11 +191,11 @@ if [ -n "${AGILE_FLOW_WORKER_ACCOUNT:-}" ] && [ "$AGILE_FLOW_WORKER_ACCOUNT" = "
         gh auth switch --user "$PERSONAL_USER" &>/dev/null 2>&1 || true
     else
         print_warning "Worker env var set but account not in keyring. Will re-authenticate."
-        AGILE_FLOW_WORKER_ACCOUNT=""
+        SETUP_WORKER_ACCOUNT=""
     fi
 fi
 
-if [ -z "${AGILE_FLOW_WORKER_ACCOUNT:-}" ] || [ "${AGILE_FLOW_WORKER_ACCOUNT:-}" != "$worker_account" ]; then
+if [ -z "${SETUP_WORKER_ACCOUNT:-}" ] || [ "${SETUP_WORKER_ACCOUNT:-}" != "$worker_account" ]; then
     echo ""
     echo "  Worker account: ${worker_account}"
     echo ""
@@ -230,7 +242,8 @@ if [ -z "${AGILE_FLOW_WORKER_ACCOUNT:-}" ] || [ "${AGILE_FLOW_WORKER_ACCOUNT:-}"
         # Restore personal before persisting env var
         gh auth switch --user "$PERSONAL_USER" &>/dev/null 2>&1 || true
 
-        persist_env_var "AGILE_FLOW_WORKER_ACCOUNT" "$worker_account"
+        persist_env_var "GEMBAFLOW_WORKER_ACCOUNT" "$worker_account"
+        SETUP_WORKER_ACCOUNT="$worker_account"
     else
         print_error "Worker account login failed. Check your PAT and try again."
         exit 1
@@ -246,17 +259,17 @@ echo -e "${CYAN}--- Step 3/4: Reviewer bot account ---${NC}"
 echo ""
 
 # Check if reviewer already configured and matches
-if [ -n "${AGILE_FLOW_REVIEWER_ACCOUNT:-}" ] && [ "$AGILE_FLOW_REVIEWER_ACCOUNT" = "$reviewer_account" ]; then
+if [ -n "${SETUP_REVIEWER_ACCOUNT:-}" ] && [ "$SETUP_REVIEWER_ACCOUNT" = "$reviewer_account" ]; then
     if gh auth switch --user "$reviewer_account" &>/dev/null 2>&1; then
         print_success "Reviewer account already configured: ${reviewer_account}"
         gh auth switch --user "$PERSONAL_USER" &>/dev/null 2>&1 || true
     else
         print_warning "Reviewer env var set but account not in keyring. Will re-authenticate."
-        AGILE_FLOW_REVIEWER_ACCOUNT=""
+        SETUP_REVIEWER_ACCOUNT=""
     fi
 fi
 
-if [ -z "${AGILE_FLOW_REVIEWER_ACCOUNT:-}" ] || [ "${AGILE_FLOW_REVIEWER_ACCOUNT:-}" != "$reviewer_account" ]; then
+if [ -z "${SETUP_REVIEWER_ACCOUNT:-}" ] || [ "${SETUP_REVIEWER_ACCOUNT:-}" != "$reviewer_account" ]; then
     echo ""
     echo "  Reviewer account: ${reviewer_account}"
     echo ""
@@ -306,7 +319,8 @@ if [ -z "${AGILE_FLOW_REVIEWER_ACCOUNT:-}" ] || [ "${AGILE_FLOW_REVIEWER_ACCOUNT
         # Restore personal before persisting env var
         gh auth switch --user "$PERSONAL_USER" &>/dev/null 2>&1 || true
 
-        persist_env_var "AGILE_FLOW_REVIEWER_ACCOUNT" "$reviewer_account"
+        persist_env_var "GEMBAFLOW_REVIEWER_ACCOUNT" "$reviewer_account"
+        SETUP_REVIEWER_ACCOUNT="$reviewer_account"
     else
         print_error "Reviewer account login failed. Check your PAT and try again."
         exit 1
@@ -325,8 +339,8 @@ echo ""
 gh auth switch --user "$PERSONAL_USER" &>/dev/null 2>&1 || true
 
 # Build summary
-worker_display="${AGILE_FLOW_WORKER_ACCOUNT:-$worker_account}"
-reviewer_display="${AGILE_FLOW_REVIEWER_ACCOUNT:-$reviewer_account}"
+worker_display="${SETUP_WORKER_ACCOUNT:-$worker_account}"
+reviewer_display="${SETUP_REVIEWER_ACCOUNT:-$reviewer_account}"
 
 # Check keyring status for each bot
 worker_status="in keyring"

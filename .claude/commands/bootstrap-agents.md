@@ -77,10 +77,49 @@ The specialization agent will:
    - Domain concepts
    - Quality thresholds
 
-3. **Update Agent Configs**
-   - Replace template placeholders
-   - Add project-specific sections
-   - Ensure consistency across agents
+3. **Update Agent Configs (outside FRAMEWORK markers)**
+
+   Each `.claude/agents/*.md` file is a **hybrid** file. Framework persona
+   and restrictions live between `<!-- FRAMEWORK:START -->` and
+   `<!-- FRAMEWORK:END -->` markers. Your project specialization must be
+   written **after** the closing marker — that's the region the framework
+   sync (`/upgrade`) will not touch.
+
+   For each agent file:
+
+   - Read the file.
+   - Locate `<!-- FRAMEWORK:END -->`.
+   - If present: append (or replace prior bootstrap-agents output) **after**
+     the closing marker. Never edit anything between the markers.
+   - If absent (legacy file from a pre-#363 fork): prepend
+     `<!-- FRAMEWORK:END -->` on a new line at the very end of the existing
+     framework body (immediately before any `<!-- Source: Gemba Flow -->` /
+     `<!-- SPDX-License-Identifier -->` lines so attribution stays inside
+     the framework section), then append the project specialization after
+     that marker. Also prepend `<!-- FRAMEWORK:START -->` on a new line
+     immediately after the YAML frontmatter `---` close, so the framework
+     body is fully bracketed. This one-time migration converts the legacy
+     file into the hybrid format without losing prior content.
+
+   The specialization itself should add sections like:
+
+   ```markdown
+   <!-- FRAMEWORK:END -->
+
+   ## Project Context
+
+   **Product**: [from PRD]
+   **Tech stack**: [from architecture doc]
+   ...
+
+   ## Tech Stack Details
+   ...
+   ```
+
+   **DO NOT** modify the YAML frontmatter (the `---` block at the top) or
+   any content between `<!-- FRAMEWORK:START -->` and
+   `<!-- FRAMEWORK:END -->`. Those regions belong to the framework and are
+   overwritten on `/upgrade`.
 
 4. **Update CLAUDE.md**
    - Fill in project-specific sections
@@ -92,28 +131,57 @@ The specialization agent will:
 After this phase, verify agents are specialized:
 
 ```bash
-# Check that template placeholders are replaced
-grep -r "TEMPLATE:" .claude/agents/
+# Every agent should have at least one non-framework section AFTER the
+# closing FRAMEWORK marker. Lists files that do NOT yet have user content
+# after `<!-- FRAMEWORK:END -->`.
+for f in .claude/agents/*.md; do
+  if ! awk '/<!-- FRAMEWORK:END -->/{flag=1; next} flag && NF{found=1} END{exit !found}' "$f"; then
+    echo "Not yet specialized: $f"
+  fi
+done
 
-# Should return no results if fully specialized
+# Also confirm no leftover template placeholders inside any agent file:
+grep -r "TEMPLATE:" .claude/agents/ || echo "OK: no template placeholders left."
 ```
 
 ## Example Transformation
 
-**Before (template):**
+**Before (fresh template):**
 ```markdown
-## Project-Specific Context
+---
+name: quality-engineer
+description: ...
+---
 
-<!--
-TEMPLATE: Fill in project-specific testing context here.
-- **Architecture**: [Description]
-- **Testing Stack**: [Frameworks]
--->
+<!-- FRAMEWORK:START -->
+
+You are a Quality Engineer...
+[framework persona and restrictions]
+
+<!-- Source: Gemba Flow (https://github.com/vibeacademy/gembaflow) -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
+<!-- FRAMEWORK:END -->
 ```
 
-**After (specialized):**
+**After (specialized — note user content appears AFTER `<!-- FRAMEWORK:END -->`):**
 ```markdown
-## Project-Specific Context
+---
+name: quality-engineer
+description: ...
+---
+
+<!-- FRAMEWORK:START -->
+
+You are a Quality Engineer...
+[framework persona and restrictions — unchanged]
+
+<!-- Source: Gemba Flow (https://github.com/vibeacademy/gembaflow) -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
+<!-- FRAMEWORK:END -->
+
+## Project Context
 
 - **Architecture**: React 18+ SPA with Node.js API backend
 - **Testing Stack**: Vitest + React Testing Library for frontend, Jest for backend
@@ -126,6 +194,10 @@ TEMPLATE: Fill in project-specific testing context here.
   - Sub-200ms API response times
   - WCAG AA accessibility
 ```
+
+The content after `<!-- FRAMEWORK:END -->` survives every future
+`/upgrade`. Content inside the markers is owned by the framework and will
+be refreshed each release.
 
 ## What Gets Unlocked
 

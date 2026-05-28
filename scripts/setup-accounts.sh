@@ -187,6 +187,8 @@ if [ -z "${AGILE_FLOW_WORKER_ACCOUNT:-}" ] || [ "${AGILE_FLOW_WORKER_ACCOUNT:-}"
     echo ""
     echo "  Worker account: ${worker_account}"
     echo ""
+    echo "  Required PAT scopes (classic): repo, workflow, project, gist, read:org"
+    echo ""
     read -s -p "  Paste your WORKER PAT: " worker_pat
     echo ""
 
@@ -257,6 +259,13 @@ fi
 if [ -z "${AGILE_FLOW_REVIEWER_ACCOUNT:-}" ] || [ "${AGILE_FLOW_REVIEWER_ACCOUNT:-}" != "$reviewer_account" ]; then
     echo ""
     echo "  Reviewer account: ${reviewer_account}"
+    echo ""
+    echo "  Required PAT scopes (classic): repo, workflow, project, gist, read:org"
+    echo "  NOTE: 'project' scope is required so the reviewer can file"
+    echo "        follow-up issues onto the project board after /review-pr."
+    echo "        If you have an existing PAT without 'project', upgrade with:"
+    echo "          gh auth refresh --user ${reviewer_account} \\"
+    echo "            --scopes repo,workflow,project,gist,read:org"
     echo ""
     read -s -p "  Paste your REVIEWER PAT: " reviewer_pat
     echo ""

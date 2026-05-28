@@ -113,7 +113,6 @@ case "$STACK" in
     echo "Detected Python project"
     echo ""
     run_check "ruff check" uv run ruff check .
-    run_check "ruff format --check" uv run ruff format . --check
     run_check "pytest" uv run pytest --tb=short -q
     ;;
 

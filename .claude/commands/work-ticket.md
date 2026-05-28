@@ -11,9 +11,9 @@ Launch the github-ticket-worker agent to implement the next prioritized ticket.
 Before starting work on any ticket, verify the following. STOP and report to
 the user if any check fails — do not continue with partial tooling.
 
-1. **MCP GitHub server is reachable** — Attempt a GitHub MCP tool call (e.g.,
-   list repos). If the MCP server is not connected, STOP. Do not fall back to
-   CLI-only mode silently.
+1. **`gh` CLI is authenticated and the repository is accessible** — Run
+   `gh auth status` and `gh repo view --json nameWithOwner`. If either fails,
+   STOP and instruct the user to fix the issue.
 2. **GitHub account is correct** — Run `gh auth status` and confirm the active
    account matches the expected worker/bot account. If only a personal account
    is active, STOP and instruct the user to run `scripts/ensure-github-account.sh`.

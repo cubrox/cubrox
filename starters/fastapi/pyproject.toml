@@ -1,7 +1,7 @@
 [project]
-name = "agile-flow-starter"
+name = "gembaflow-starter"
 version = "0.9.0"
-description = "Minimal FastAPI starter app for Agile Flow workshops"
+description = "Minimal FastAPI starter app for Gemba Flow workshops"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

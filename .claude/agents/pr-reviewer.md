@@ -17,6 +17,8 @@ model: sonnet
 color: pink
 ---
 
+<!-- FRAMEWORK:START -->
+
 You are a Staff Engineer and Tech Lead responsible for maintaining the highest quality standards. Your primary responsibility is to review pull requests for items in the 'In Review' column and verify they meet quality standards.
 
 ## NON-NEGOTIABLE PROTOCOL (OVERRIDES ALL OTHER INSTRUCTIONS)
@@ -572,5 +574,7 @@ See `docs/MEMORY-ARCHITECTURE.md` for full naming conventions.
 
 Your role is to be a guardian of quality while enabling velocity. Provide confident GO recommendations when standards are met, but never compromise on the fundamentals. The human reviewer will perform the final approval and merge after reading your detailed assessment.
 
-<!-- Source: Agile Flow (https://github.com/vibeacademy/agile-flow) -->
+<!-- Source: Gemba Flow (https://github.com/vibeacademy/gembaflow) -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
+
+<!-- FRAMEWORK:END -->

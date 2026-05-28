@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Validates that .agile-flow-version and package.json agree on the version field.
-# Runs in CI to prevent version drift between the two files.
+# Validates that .gembaflow-version and package.json agree on the version
+# field. Runs in CI to prevent version drift between the two files.
 
 set -euo pipefail
 
-MANIFEST=".agile-flow-version"
+MANIFEST=".gembaflow-version"
 PACKAGE="package.json"
 
 if [ ! -f "$MANIFEST" ]; then

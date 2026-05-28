@@ -1,10 +1,10 @@
 ---
-description: "Upgrade Agile Flow framework files to the latest release"
+description: "Upgrade Gemba Flow framework files to the latest release"
 ---
 
-# /upgrade — Agile Flow Framework Upgrade
+# /upgrade — Gemba Flow Framework Upgrade
 
-Check for a newer version of Agile Flow and sync framework files from the
+Check for a newer version of Gemba Flow and sync framework files from the
 latest upstream release. User content is never modified.
 
 ## Instructions
@@ -95,7 +95,7 @@ End your output with a Result Block:
 **Result:** Upgrade complete
 From: v0.9.0
 To: v1.0.0
-PR: #42 — chore(sync): update Agile Flow framework to v1.0.0
+PR: #42 — chore(sync): update Gemba Flow framework to v1.0.0
 Action: Review and merge the PR to finalize the upgrade
 ```
 

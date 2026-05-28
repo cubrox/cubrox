@@ -13,7 +13,7 @@
 #   post-bootstrap-full     — User completed full bootstrap (product + architecture + workflow)
 #   modified-agents         — User has customized agent definitions
 #   modified-commands       — User has customized command files
-#   has-overrides           — User has .agile-flow-overrides configured
+#   has-overrides           — User has .gembaflow-overrides configured
 #   uncommitted-framework   — User has uncommitted changes in framework files
 #   uncommitted-userland    — User has uncommitted changes in user content only
 #   mid-feature             — User is mid-feature branch with changes
@@ -215,7 +215,7 @@ scenario_modified_commands() {
 scenario_has_overrides() {
   log_info "Applying scenario: has-overrides"
   
-  cat > .agile-flow-overrides << 'EOF'
+  cat > .gembaflow-overrides << 'EOF'
 # Files that should not be overwritten during /upgrade
 # One path per line, relative to repo root
 
@@ -230,8 +230,8 @@ scenario_has_overrides() {
 .github/workflows/custom-deploy.yml
 EOF
 
-  git add .agile-flow-overrides 2>/dev/null || true
-  log_info "Created .agile-flow-overrides with protected paths"
+  git add .gembaflow-overrides 2>/dev/null || true
+  log_info "Created .gembaflow-overrides with protected paths"
 }
 
 # Scenario: uncommitted-framework
@@ -341,14 +341,14 @@ EOF
 scenario_stale_version() {
   log_info "Applying scenario: stale-version"
   
-  if [ -f ".agile-flow-meta/version" ]; then
-    echo "v0.9.0" > .agile-flow-meta/version
-    git add .agile-flow-meta/version 2>/dev/null || true
-    log_info "Set .agile-flow-meta/version to v0.9.0 (stale)"
+  if [ -f ".gembaflow-meta/version" ]; then
+    echo "v0.9.0" > .gembaflow-meta/version
+    git add .gembaflow-meta/version 2>/dev/null || true
+    log_info "Set .gembaflow-meta/version to v0.9.0 (stale)"
   else
-    mkdir -p .agile-flow-meta
-    echo "v0.9.0" > .agile-flow-meta/version
-    log_info "Created .agile-flow-meta/version at v0.9.0 (stale)"
+    mkdir -p .gembaflow-meta
+    echo "v0.9.0" > .gembaflow-meta/version
+    log_info "Created .gembaflow-meta/version at v0.9.0 (stale)"
   fi
 }
 
@@ -392,7 +392,7 @@ list_scenarios() {
   echo "  post-bootstrap-full     — User completed full bootstrap (product + architecture)"
   echo "  modified-agents         — User has customized agent definitions"
   echo "  modified-commands       — User has customized command files"
-  echo "  has-overrides           — User has .agile-flow-overrides configured"
+  echo "  has-overrides           — User has .gembaflow-overrides configured"
   echo "  uncommitted-framework   — User has uncommitted changes in framework files"
   echo "  uncommitted-userland    — User has uncommitted changes in user content only"
   echo "  mid-feature             — User is mid-feature branch with changes"

@@ -344,3 +344,114 @@ def test_value_for_form_helper_handles_booleans_and_strings() -> None:
     assert value_for_form(False) == "false"
     assert value_for_form("18px") == "18px"
     assert value_for_form("#ffffff") == "#ffffff"
+
+
+# ---------------------------------------------------------------------------
+# Bionic immediate apply — the toggle must re-render the passage text, not
+# just the <style> block (bionic is server-rendered <b> markup, not CSS).
+# ---------------------------------------------------------------------------
+
+
+def test_bionic_toggle_oob_swaps_the_reading_surface(client: TestClient, session: Session) -> None:
+    """Turning bionic ON with a passage_id returns BOTH the <style> block
+    (primary swap) AND the re-rendered article as an out-of-band swap, so
+    the surface updates without a full reload. Without the OOB swap the
+    bionic emphasis only appeared after a manual reload."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    response = client.post(
+        "/preferences/bionic_enabled",
+        data={"value": "true", "passage_id": str(passage.id)},
+    )
+
+    assert response.status_code == 200
+    body = response.text
+    # Primary swap target survives.
+    assert '<style id="reading-surface-style">' in body
+    # OOB-swapped, re-rendered article with bionic <b> markup.
+    assert 'hx-swap-oob="true"' in body
+    assert 'id="reading-surface"' in body
+    # "test passage" -> "<b>te</b>st <b>pass</b>age" under bionicize.
+    assert "<b>" in body
+
+
+def test_bionic_toggle_off_oob_swaps_back_to_plain_text(
+    client: TestClient, session: Session
+) -> None:
+    """Turning bionic OFF must also re-render the surface — back to plain
+    text with no <b> markup — via the same OOB swap."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    response = client.post(
+        "/preferences/bionic_enabled",
+        data={"value": "false", "passage_id": str(passage.id)},
+    )
+
+    assert response.status_code == 200
+    body = response.text
+    assert 'hx-swap-oob="true"' in body
+    assert 'id="reading-surface"' in body
+    assert "<b>" not in body
+    assert "test passage" in body
+
+
+def test_non_bionic_toggle_does_not_oob_swap_surface(client: TestClient, session: Session) -> None:
+    """CSS-only preferences (e.g. size) change a `var(--reader-*)` value —
+    the <style> swap alone is enough, so re-sending the whole passage text
+    would be wasted bandwidth. Even when a passage_id is supplied, a
+    non-bionic toggle returns the style block only, no OOB article."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    response = client.post(
+        "/preferences/size",
+        data={"value": "20px", "passage_id": str(passage.id)},
+    )
+
+    assert response.status_code == 200
+    body = response.text
+    assert "--reader-size: 20px" in body
+    assert 'hx-swap-oob="true"' not in body
+    # Only the <style id="reading-surface-style"> element exists; the bare
+    # article id must not appear.
+    assert 'id="reading-surface"' not in body
+
+
+def test_bionic_toggle_without_passage_id_returns_style_only(
+    client: TestClient, session: Session
+) -> None:
+    """Back-compat: callers that don't pass a passage_id (direct API use,
+    unit tests) still get a valid 200 with just the <style> block — no
+    OOB swap, no error."""
+    signed_in(session)
+
+    response = client.post("/preferences/bionic_enabled", data={"value": "true"})
+
+    assert response.status_code == 200
+    body = response.text
+    assert '<style id="reading-surface-style">' in body
+    assert 'hx-swap-oob="true"' not in body
+
+
+def test_bionic_toggle_with_other_users_passage_id_does_not_oob_swap(
+    client: TestClient, session: Session
+) -> None:
+    """A passage_id the user doesn't own yields no OOB swap (and no error
+    or existence leak) — the preference write still succeeds."""
+    from tests.conftest import make_user
+
+    other = make_user(session, email="other@example.com")
+    other_passage = _make_passage(session, other.id)
+
+    signed_in(session)  # swaps current_user to a fresh user
+    response = client.post(
+        "/preferences/bionic_enabled",
+        data={"value": "true", "passage_id": str(other_passage.id)},
+    )
+
+    assert response.status_code == 200
+    body = response.text
+    assert '<style id="reading-surface-style">' in body
+    assert 'hx-swap-oob="true"' not in body

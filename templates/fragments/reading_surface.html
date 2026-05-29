@@ -1,0 +1,1 @@
+<article id="reading-surface"{% if oob %} hx-swap-oob="true"{% endif %}>{% if prefs.bionic_enabled %}{{ passage.text | bionic }}{% else %}{{ passage.text }}{% endif %}</article>

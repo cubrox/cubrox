@@ -3,6 +3,10 @@
 {% block title %}Reading — Master Key{% endblock %}
 
 {% block content %}
+  <nav class="reading-nav" aria-label="Back">
+    <a href="/passages/new" class="back-link"><span aria-hidden="true">&larr;</span> Add a passage</a>
+  </nav>
+
   {% include "fragments/reader_style.html" %}
 
   {% include "fragments/reading_surface.html" %}

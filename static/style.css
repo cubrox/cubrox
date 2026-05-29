@@ -22,6 +22,26 @@
   overflow-wrap: break-word;
 }
 
+/* Back link on the reading view — returns to /passages/new (the passage
+   input page). Aligned to the reading surface's centered column so it sits
+   above the text, not flush against the viewport edge. Lives outside
+   #reading-surface, so it uses the page's default colors (not the user's
+   chosen reader bg/fg). */
+.reading-nav {
+  max-width: var(--reader-max-width, 65ch);
+  margin: 1rem auto 0;
+}
+
+.back-link {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.back-link:hover,
+.back-link:focus {
+  text-decoration: underline;
+}
+
 /* Preference-toggle sidebar — opens as a Pico <details> at the bottom
    of the reading view. Each <fieldset> is one preference key; each
    <button> is one allow-listed option. aria-pressed reflects the

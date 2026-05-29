@@ -106,6 +106,21 @@ def test_passage_renders_inside_reading_surface_article(
     assert '<article id="reading-surface">' in body
 
 
+def test_reading_view_has_back_link_to_passage_input(client: TestClient, session: Session) -> None:
+    """The reading view must offer a way back to the passage-input page
+    (/passages/new) — otherwise a reader is stranded with no navigation.
+    The link's accessible name is its visible text ('Add a passage'); the
+    arrow glyph is decorative (aria-hidden)."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    response = client.get(f"/read/{passage.id}")
+    body = response.text
+
+    assert 'href="/passages/new"' in body
+    assert 'aria-hidden="true"' in body  # decorative arrow, not announced
+
+
 # ---------------------------------------------------------------------------
 # Defaults vs. stored preferences
 # ---------------------------------------------------------------------------

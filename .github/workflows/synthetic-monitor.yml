@@ -1,0 +1,140 @@
+name: Synthetic Auth Monitor
+
+# End-to-end auth smoke test against the LIVE production deploy. Mints a
+# throwaway Supabase session and drives the real app through
+# callback -> authed page -> reload -> logout (scripts/smoke_auth.py).
+#
+# Why scheduled (not just per-deploy): the regression this guards against
+# (#79) was production silently serving a stale, Neon-backed revision for
+# ~24h AFTER the cutover "shipped". A per-deploy check wouldn't have caught
+# drift that happens between deploys. Hourly catches it within the hour.
+#
+# Operator prerequisites (one-time):
+#   - The workflow's GCP identity needs `roles/run.viewer` (to read the
+#     service URL) and `roles/secretmanager.secretAccessor` on the
+#     supabase-url / supabase-anon-key / supabase-service-key secrets.
+#   - The Supabase project must allow email+password sign-in (Supabase
+#     default) — that's how the throwaway session is minted.
+
+on:
+  schedule:
+    # Hourly at :17 past, to avoid top-of-hour runner congestion.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Override target base URL (defaults to the resolved Cloud Run URL)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  monitor:
+    name: Probe production sign-in
+    runs-on: ubuntu-latest
+    # Don't run on the upstream template repo — only on configured forks.
+    if: github.repository != 'vibeacademy/agile-flow-gcp'
+
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE || 'agile-flow-app' }}
+
+    steps:
+      - name: Check for required secrets
+        id: check_secrets
+        # GitHub Actions rejects `secrets.*` inside `if:` expressions, so we
+        # promote presence checks into outputs the downstream gates read.
+        # Same pattern as deploy.yml.
+        run: |
+          if [ -z "${{ secrets.GCP_PROJECT_ID }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "auth_method=none" >> "$GITHUB_OUTPUT"
+            echo "GCP_PROJECT_ID not configured -- skipping synthetic monitor."
+          elif [ -n "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "auth_method=wif" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ secrets.GCP_SA_KEY }}" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "auth_method=sa-key" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "auth_method=none" >> "$GITHUB_OUTPUT"
+            echo "Neither GCP_WORKLOAD_IDENTITY_PROVIDER nor GCP_SA_KEY configured -- skipping."
+          fi
+
+      - name: Checkout code
+        if: steps.check_secrets.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        if: steps.check_secrets.outputs.auth_method == 'wif'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Authenticate to Google Cloud (Service Account Key fallback)
+        if: steps.check_secrets.outputs.auth_method == 'sa-key'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        if: steps.check_secrets.outputs.skip != 'true'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve target URL + Supabase credentials
+        id: resolve
+        if: steps.check_secrets.outputs.skip != 'true'
+        env:
+          BASE_URL_INPUT: ${{ inputs.base_url }}
+        run: |
+          set -euo pipefail
+
+          # Target URL: manual-dispatch override wins, else the live Cloud Run URL.
+          if [ -n "${BASE_URL_INPUT:-}" ]; then
+            URL="$BASE_URL_INPUT"
+          else
+            URL=$(gcloud run services describe "${SERVICE_NAME}" \
+              --region="${GCP_REGION}" \
+              --format='value(status.url)')
+          fi
+          if [ -z "$URL" ]; then
+            echo "Could not resolve a target URL." >&2
+            exit 1
+          fi
+          echo "SMOKE_BASE_URL=$URL" >> "$GITHUB_ENV"
+          echo "Target: $URL"
+
+          # Pull Supabase creds from Secret Manager (same secrets deploy.yml
+          # mounts onto the Cloud Run revision). Mask before exporting so they
+          # never surface in logs.
+          SB_URL=$(gcloud secrets versions access latest --secret=supabase-url \
+            --project="${GCP_PROJECT_ID}")
+          SB_ANON=$(gcloud secrets versions access latest --secret=supabase-anon-key \
+            --project="${GCP_PROJECT_ID}")
+          SB_SERVICE=$(gcloud secrets versions access latest --secret=supabase-service-key \
+            --project="${GCP_PROJECT_ID}")
+          echo "::add-mask::$SB_ANON"
+          echo "::add-mask::$SB_SERVICE"
+          {
+            echo "SUPABASE_URL=$SB_URL"
+            echo "SUPABASE_ANON_KEY=$SB_ANON"
+            echo "SUPABASE_SERVICE_KEY=$SB_SERVICE"
+          } >> "$GITHUB_ENV"
+
+      - name: Install uv
+        if: steps.check_secrets.outputs.skip != 'true'
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        if: steps.check_secrets.outputs.skip != 'true'
+        run: uv sync
+
+      - name: Run synthetic auth monitor
+        if: steps.check_secrets.outputs.skip != 'true'
+        run: uv run python scripts/smoke_auth.py

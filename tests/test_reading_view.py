@@ -118,7 +118,11 @@ def test_reading_view_has_back_link_to_passage_input(client: TestClient, session
     body = response.text
 
     assert 'href="/passages/new"' in body
-    assert 'aria-hidden="true"' in body  # decorative arrow, not announced
+    # Pin the link's exact shape: decorative arrow (aria-hidden, not
+    # announced) + the visible accessible name. A bare `aria-hidden`
+    # substring check wouldn't guard this — the page has aria-hidden
+    # elsewhere (the close beacon).
+    assert '<span aria-hidden="true">&larr;</span> Add a passage' in body
 
 
 # ---------------------------------------------------------------------------

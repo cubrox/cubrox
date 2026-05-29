@@ -5,7 +5,7 @@
 {% block content %}
   {% include "fragments/reader_style.html" %}
 
-  <article id="reading-surface">{% if prefs.bionic_enabled %}{{ passage.text | bionic }}{% else %}{{ passage.text }}{% endif %}</article>
+  {% include "fragments/reading_surface.html" %}
 
   <div id="questions-panel"
        hx-get="/passages/{{ passage.id }}/questions"
@@ -61,7 +61,7 @@
           <button
             type="button"
             hx-post="/preferences/{{ key }}"
-            hx-vals='{"value": "{{ value_for_form(opt) }}"}'
+            hx-vals='{"value": "{{ value_for_form(opt) }}", "passage_id": "{{ passage.id }}"}'
             hx-target="#reading-surface-style"
             hx-swap="outerHTML"
             aria-pressed="{{ 'true' if prefs[key] == opt else 'false' }}"

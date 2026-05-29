@@ -109,6 +109,7 @@ def update_preference(
     user: CurrentUser,
     session: SessionDep,
     value: Annotated[str, Form()],
+    passage_id: Annotated[uuid.UUID | None, Form()] = None,
 ) -> HTMLResponse:
     """Set ONE preference and return the swappable <style> fragment.
 
@@ -120,6 +121,15 @@ def update_preference(
     be allow-listed. This is the dependent invariant the READ-1
     reviewer flagged: without it, the `| safe` filter in the template
     would let a user inject arbitrary CSS.
+
+    Bionic is the one preference that is NOT a CSS variable: it injects
+    server-rendered `<b>` markup into the passage text. A `<style>`-only
+    swap therefore can't apply it — the surface would stay stale until a
+    full reload. So when `bionic_enabled` changes and the caller passes
+    the `passage_id`, we also re-render the article and return it as an
+    out-of-band swap. `passage_id` is optional (CSS-only toggles and the
+    unit tests don't send it); an unknown or cross-user id simply yields
+    no OOB swap, never an error or an existence leak.
     """
     if key not in PREFERENCE_OPTIONS:
         raise HTTPException(status_code=422, detail=f"Unknown preference key: {key!r}")
@@ -139,10 +149,16 @@ def update_preference(
     stored_pref = session.get(Preference, user.id)
     prefs = with_defaults(stored_pref.values if stored_pref else None)
 
+    passage: Passage | None = None
+    if key == "bionic_enabled" and passage_id is not None:
+        passage = session.exec(
+            select(Passage).where(Passage.id == passage_id, Passage.owner_id == user.id)  # type: ignore[arg-type]
+        ).first()
+
     return templates.TemplateResponse(
         request=request,
-        name="fragments/reader_style.html",
-        context={"prefs": prefs},
+        name="fragments/preference_update.html",
+        context={"prefs": prefs, "passage": passage},
     )
 
 

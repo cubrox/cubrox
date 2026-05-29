@@ -73,7 +73,7 @@ import uuid
 
 import httpx
 
-from supabase import create_client
+from supabase import Client, create_client
 
 # Marks the throwaway accounts this monitor creates, so any that leak (e.g. a
 # crash between create and delete) are obvious in the Supabase user list.
@@ -120,32 +120,38 @@ def _cookie_header_clears(set_cookie_values: list[str]) -> bool:
     return False
 
 
-def mint_session(supabase_url: str, anon_key: str, service_key: str) -> tuple[str, str, str]:
-    """Create a confirmed throwaway user and return (access_token, refresh_token, user_id).
+def create_throwaway_user(service: Client) -> tuple[str, str, str]:
+    """Create a confirmed throwaway user; return (user_id, email, password).
 
-    Mirrors app/api/test_seed.py: admin.create_user(email_confirm=True) then a
-    password grant. The resulting JWT is identical in shape to what a real
-    magic-link sign-in yields, so `/auth/callback` and `current_user` accept it.
+    Split from sign-in deliberately: the caller must learn `user_id` the
+    instant the user exists, so its `finally` can always delete it — even if
+    the subsequent sign-in step raises. Folding create + sign-in into one
+    function hid the user_id until success and leaked the user on a sign-in
+    error.
+
+    Mirrors app/api/test_seed.py: admin.create_user(email_confirm=True).
     """
     email = f"smoke-{uuid.uuid4()}@{SMOKE_EMAIL_DOMAIN}"
     password = secrets.token_urlsafe(32)
 
-    service = create_client(supabase_url, service_key)
     created = service.auth.admin.create_user(
         {"email": email, "password": password, "email_confirm": True}
     )
     if created is None or created.user is None:
         raise SmokeFailure("Supabase admin.create_user did not return a user")
-    user_id = str(created.user.id)
+    return str(created.user.id), email, password
 
-    anon = create_client(supabase_url, anon_key)
+
+def sign_in(anon: Client, email: str, password: str) -> tuple[str, str]:
+    """Exchange the throwaway user's password for a session; return (access, refresh).
+
+    The resulting JWT is identical in shape to what a real magic-link sign-in
+    yields, so `/auth/callback` and `current_user` accept it identically.
+    """
     auth_resp = anon.auth.sign_in_with_password({"email": email, "password": password})
     if auth_resp is None or auth_resp.session is None:
-        # Best-effort cleanup before bailing: we already created the user.
-        service.auth.admin.delete_user(user_id)
         raise SmokeFailure("Supabase sign-in did not return a session for the seeded user")
-
-    return auth_resp.session.access_token, auth_resp.session.refresh_token or "", user_id
+    return auth_resp.session.access_token, auth_resp.session.refresh_token or ""
 
 
 def run_flow(base_url: str, access_token: str, refresh_token: str) -> None:
@@ -230,17 +236,29 @@ def main() -> int:
 
     print(f"Synthetic auth monitor → {base_url}", flush=True)
 
-    user_id: str | None = None
     service_client = create_client(supabase_url, service_key)
+    anon = create_client(supabase_url, anon_key)
+
+    # Learn user_id BEFORE sign-in so the finally below always cleans up,
+    # even if sign-in raises (a transient Supabase error). Initialized None
+    # so a create-user failure leaves nothing to delete.
+    user_id: str | None = None
     try:
-        access_token, refresh_token, user_id = mint_session(supabase_url, anon_key, service_key)
-        _step(f"minted throwaway session for user {user_id}")
+        user_id, email, password = create_throwaway_user(service_client)
+        _step(f"created throwaway user {user_id}")
+        access_token, refresh_token = sign_in(anon, email, password)
+        _step("minted session via password grant")
         run_flow(base_url, access_token, refresh_token)
     except SmokeFailure as exc:
         print(f"FAIL: {exc}", flush=True)
         return 1
     except httpx.HTTPError as exc:
         print(f"FAIL: HTTP error reaching {base_url}: {exc}", flush=True)
+        return 1
+    except Exception as exc:  # noqa: BLE001 — Supabase client errors (AuthApiError, etc.)
+        # A monitor's own crash should read as a clean FAIL, not a traceback —
+        # otherwise an upstream Supabase hiccup looks like a code bug.
+        print(f"FAIL: unexpected error: {type(exc).__name__}: {exc}", flush=True)
         return 1
     finally:
         if user_id is not None:

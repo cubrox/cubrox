@@ -1,0 +1,12 @@
+{#
+  Response fragment for POST /preferences/{key}.
+
+  Always returns the swappable <style> block (HTMX primary target
+  #reading-surface-style). When a passage is supplied — i.e. the toggle
+  changed `bionic_enabled`, which alters server-rendered <b> markup in
+  the passage text rather than a CSS variable — it ALSO returns the
+  re-rendered article as an out-of-band swap so the surface updates
+  without a full page reload.
+#}
+{% include "fragments/reader_style.html" %}
+{% if passage is not none %}{% with oob = true %}{% include "fragments/reading_surface.html" %}{% endwith %}{% endif %}

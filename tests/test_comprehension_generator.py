@@ -142,6 +142,33 @@ def test_second_call_after_miss_is_a_cache_hit(session: Session) -> None:
     assert client.messages.create.call_count == 1  # only the first call
 
 
+def test_epic6_cost_acceptance_10_passages_5_rereads_is_10_calls(session: Session) -> None:
+    """Epic #6 acceptance criterion, encoded as a regression guard:
+
+        "LLM cost test (10 distinct passages, 5 re-reads each) shows
+         exactly 10 API calls."
+
+    The whole ADR-001 cost story is that re-reads are free. Ten distinct
+    passages read five times each is fifty reads but must cost only ten
+    Anthropic calls — one per distinct passage, the rest served from the
+    cache. A single shared mock client counts every call across the run.
+    """
+    client = _make_mock_client()
+    passages = [f"{TEST_PASSAGE} (variation {i})" for i in range(10)]
+
+    for _reread in range(5):
+        for passage in passages:
+            generate_questions(
+                passage_text=passage,
+                question_type="recall",
+                client=client,
+                model_id=TEST_MODEL_ID,
+                session=session,
+            )
+
+    assert client.messages.create.call_count == 10  # 50 reads, 10 distinct → 10 calls
+
+
 # ---------------------------------------------------------------------------
 # Input-cap contract — the runaway-cost prevention
 # ---------------------------------------------------------------------------

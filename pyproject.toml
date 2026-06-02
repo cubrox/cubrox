@@ -1,7 +1,7 @@
 [project]
 name = "agile-flow-gcp"
 version = "0.1.0"
-description = "Agile Flow GCP Edition — FastAPI + Jinja2 + HTMX starter for Cloud Run + Neon"
+description = "Agile Flow GCP Edition — FastAPI + Jinja2 + HTMX starter for Cloud Run + Supabase"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
@@ -33,9 +33,6 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "B", "UP"]
-
-[tool.ruff.lint.per-file-ignores]
-"alembic/versions/*.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

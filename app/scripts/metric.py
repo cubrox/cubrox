@@ -10,7 +10,7 @@ endpoint, no per-user breakdown — this is the release-decision tool,
 not a dashboard.
 
 The script reads from the same `DATABASE_URL` the FastAPI app uses;
-running it against a Neon branch needs the branch's URL exported.
+running it against a Supabase branch needs the branch's URL exported.
 """
 
 import argparse

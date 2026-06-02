@@ -51,7 +51,6 @@ jobs:
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "auth_method=none" >> "$GITHUB_OUTPUT"
-            echo "neon_configured=false" >> "$GITHUB_OUTPUT"
             echo "No GCP auth configured — skipping preview deploy."
           fi
       - name: Checkout code
@@ -187,7 +186,7 @@ jobs:
 
           # Phase 1: app readiness — /api/health does NOT touch the DB,
           # so a passing probe means the container booted and is serving
-          # HTTP. Retry loop covers Cloud Run cold-start + Neon wake.
+          # HTTP. Retry loop covers Cloud Run cold-start.
           echo "Phase 1: $PREVIEW_URL/api/health"
 
           health_passed=false

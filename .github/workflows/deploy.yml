@@ -137,7 +137,7 @@ jobs:
           # Both workflows now write DATABASE_URL as a literal. The
           # connection string is on the revision instead of in Secret
           # Manager — acceptable trade-off because preview already exposes
-          # Neon URLs as literals; consistency between the pipelines is
+          # database URLs as literals; consistency between the pipelines is
           # more valuable than asymmetric hardening of just one. See #67.
           # Every env var the production app needs at runtime is set here,
           # explicitly, so the deployed revision never depends on whatever
@@ -153,7 +153,7 @@ jobs:
           # interventions that nobody documented.
           #
           # Secrets sourced from GitHub Secrets:
-          #   - PRODUCTION_DATABASE_URL  → DATABASE_URL    (Neon production)
+          #   - PRODUCTION_DATABASE_URL  → DATABASE_URL    (Supabase production)
           #   - SESSION_SECRET           → SESSION_SECRET  (cookie signer)
           #   - RESEND_API_KEY           → RESEND_API_KEY  (magic-link email)
           #   - ANTHROPIC_API_KEY (opt)  → ANTHROPIC_API_KEY (comp questions)

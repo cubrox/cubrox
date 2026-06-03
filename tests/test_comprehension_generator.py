@@ -69,9 +69,7 @@ def test_cache_hit_returns_immediately_without_calling_anthropic(session: Sessio
     before the Anthropic SDK is touched. Verify by pre-populating the
     cache and asserting the mock client's create() is never called."""
     text_hash = hashlib.sha256(TEST_PASSAGE.encode("utf-8")).digest()
-    cached_questions = [
-        {"type": "recall", "text": "cached question?", "answer": "cached answer."}
-    ]
+    cached_questions = [{"type": "recall", "text": "cached question?", "answer": "cached answer."}]
 
     cache.put_cache(
         passage_hash=text_hash,

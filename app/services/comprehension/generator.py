@@ -73,10 +73,16 @@ class _Question(BaseModel):
     The Literal on `type` is the structural enforcement of the prompt's
     'recall' or 'summary' allow-list. If the LLM emits any other type,
     Pydantic raises ValidationError and we surface GeneratorError.
+
+    `answer` (COMP-4 / #123) is the source-grounded model answer the
+    reader self-assesses against — required and non-empty, so a v2
+    response missing it is rejected as a malformed (poison-cache)
+    response rather than cached without an answer.
     """
 
     type: Annotated[Literal["recall", "summary"], Field()]
     text: Annotated[str, Field(min_length=1, max_length=500)]
+    answer: Annotated[str, Field(min_length=1, max_length=500)]
 
 
 _QUESTIONS_ADAPTER: TypeAdapter[list[_Question]] = TypeAdapter(list[_Question])

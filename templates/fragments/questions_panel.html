@@ -1,9 +1,21 @@
 <section aria-label="Comprehension check" id="questions-panel">
   {% if questions %}
     <h2>Check your understanding</h2>
+    <p>Answer each in your own words, then reveal the answer to check yourself.</p>
     <ol>
       {% for q in questions %}
-        <li>{{ q.text }}</li>
+        <li>
+          {# The question doubles as the textarea's accessible name. #}
+          <label for="answer-{{ loop.index }}">{{ q.text }}</label>
+          <textarea id="answer-{{ loop.index }}" name="answer-{{ loop.index }}"
+                    rows="2" placeholder="Write your answer (optional)"></textarea>
+          {# Native <details> reveal — accessible, no JS, no server round-trip.
+             The model answer is source-grounded; the reader self-assesses. #}
+          <details>
+            <summary>Reveal answer</summary>
+            <p>{{ q.answer }}</p>
+          </details>
+        </li>
       {% endfor %}
     </ol>
   {% elif error == "too_long" %}

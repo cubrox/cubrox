@@ -37,9 +37,12 @@ TEST_MODEL_ID = "claude-haiku-4-5"
 TEST_PASSAGE = "O Son of Spirit! My first counsel is this: possess a pure, kindly heart."
 
 VALID_LLM_OUTPUT = (
-    '[{"type":"recall","text":"What is the first counsel?"},'
-    '{"type":"recall","text":"What attribute should the heart have?"},'
-    '{"type":"summary","text":"What virtue is the passage urging?"}]'
+    '[{"type":"recall","text":"What is the first counsel?",'
+    '"answer":"To possess a pure, kindly heart."},'
+    '{"type":"recall","text":"What attribute should the heart have?",'
+    '"answer":"It should be pure and kindly."},'
+    '{"type":"summary","text":"What virtue is the passage urging?",'
+    '"answer":"Purity and kindliness of heart."}]'
 )
 
 
@@ -66,7 +69,9 @@ def test_cache_hit_returns_immediately_without_calling_anthropic(session: Sessio
     before the Anthropic SDK is touched. Verify by pre-populating the
     cache and asserting the mock client's create() is never called."""
     text_hash = hashlib.sha256(TEST_PASSAGE.encode("utf-8")).digest()
-    cached_questions = [{"type": "recall", "text": "cached question?"}]
+    cached_questions = [
+        {"type": "recall", "text": "cached question?", "answer": "cached answer."}
+    ]
 
     cache.put_cache(
         passage_hash=text_hash,
@@ -105,7 +110,11 @@ def test_cache_miss_calls_anthropic_once_and_persists(session: Session) -> None:
 
     assert client.messages.create.call_count == 1
     assert len(result) == 3
-    assert result[0] == {"type": "recall", "text": "What is the first counsel?"}
+    assert result[0] == {
+        "type": "recall",
+        "text": "What is the first counsel?",
+        "answer": "To possess a pure, kindly heart.",
+    }
 
     # And the cache now has it.
     text_hash = hashlib.sha256(TEST_PASSAGE.encode("utf-8")).digest()
@@ -318,6 +327,51 @@ def test_schema_mismatched_response_raises_generator_error(session: Session) -> 
         )
 
 
+def test_response_missing_answer_field_raises_generator_error(session: Session) -> None:
+    """COMP-4 (#123): a v2 response must carry an `answer` per question.
+    A question with valid type+text but no answer is malformed — reject
+    it as GeneratorError rather than cache a question with no answer to
+    reveal."""
+    bad_payload = '[{"type":"recall","text":"What is the first counsel?"}]'
+    client = _make_mock_client(response_text=bad_payload)
+
+    with pytest.raises(GeneratorError):
+        generate_questions(
+            passage_text=TEST_PASSAGE,
+            question_type="recall",
+            client=client,
+            model_id=TEST_MODEL_ID,
+            session=session,
+        )
+
+
+def test_answer_is_parsed_and_cached(session: Session) -> None:
+    """COMP-4 (#123): the source-grounded answer rides the existing cache
+    alongside the question — no separate storage, no extra LLM call on
+    re-read."""
+    client = _make_mock_client()
+
+    result = generate_questions(
+        passage_text=TEST_PASSAGE,
+        question_type="recall",
+        client=client,
+        model_id=TEST_MODEL_ID,
+        session=session,
+    )
+    assert all(q["answer"] for q in result)
+
+    text_hash = hashlib.sha256(TEST_PASSAGE.encode("utf-8")).digest()
+    cached = cache.get_cached(
+        passage_hash=text_hash,
+        question_type="recall",
+        model_id=TEST_MODEL_ID,
+        prompt_version=PROMPT_VERSION,
+        session=session,
+    )
+    assert cached is not None
+    assert cached[0]["answer"] == "To possess a pure, kindly heart."
+
+
 def test_malformed_response_does_not_poison_cache(session: Session) -> None:
     """A failed call must NOT write the bad output to the cache. Otherwise
     every retry would serve the broken result without re-calling the LLM."""
@@ -471,6 +525,7 @@ def test_return_shape_is_list_of_plain_dicts(session: Session) -> None:
     assert isinstance(result, list)
     for q in result:
         assert isinstance(q, dict)
-        assert set(q.keys()) == {"type", "text"}
+        assert set(q.keys()) == {"type", "text", "answer"}
         assert isinstance(q["text"], str)
+        assert isinstance(q["answer"], str)
         assert q["type"] in ("recall", "summary")

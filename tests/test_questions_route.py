@@ -77,9 +77,9 @@ def test_owner_gets_questions_fragment(
     monkeypatch.setattr(
         "app.api.reading.generate_questions",
         lambda **_: [
-            {"type": "recall", "text": "What is the first word?"},
-            {"type": "recall", "text": "What is the last word?"},
-            {"type": "summary", "text": "What is the passage about?"},
+            {"type": "recall", "text": "What is the first word?", "answer": "O."},
+            {"type": "recall", "text": "What is the last word?", "answer": "Heart."},
+            {"type": "summary", "text": "What is the passage about?", "answer": "Purity."},
         ],
     )
 
@@ -91,6 +91,35 @@ def test_owner_gets_questions_fragment(
     assert "<ol>" in body
     assert body.count("<li>") == 3
     assert "What is the first word?" in body
+
+
+def test_questions_fragment_renders_interactive_answer_ui(
+    client: TestClient,
+    session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """COMP-4 (#123): each question renders an accessible self-assessment
+    UI — a labeled answer textarea + a <details> reveal containing the
+    source-grounded model answer."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    monkeypatch.setattr(
+        "app.api.reading.generate_questions",
+        lambda **_: [
+            {"type": "recall", "text": "Who is addressed?", "answer": "The Son of Spirit."},
+        ],
+    )
+
+    body = client.get(f"/passages/{passage.id}/questions").text
+
+    # Labeled, accessible answer input (label `for` matches textarea `id`).
+    assert '<label for="answer-1">Who is addressed?</label>' in body
+    assert 'id="answer-1"' in body and "<textarea" in body
+    # Native reveal carrying the source-grounded answer.
+    assert "<details>" in body
+    assert "<summary>Reveal answer</summary>" in body
+    assert "The Son of Spirit." in body
 
 
 def test_response_is_a_fragment_not_a_full_page(

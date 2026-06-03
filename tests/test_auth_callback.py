@@ -35,6 +35,10 @@ def test_stage1_no_params_renders_hash_extractor_html(
     # The JS bridge that converts hash → query params is the whole point.
     assert "window.location.hash" in body
     assert "/auth/callback" in body
+    # A11Y-4 (#121): the bridge is hand-built HTML (not via base.html),
+    # so it must declare its language itself — axe flags a missing
+    # `lang` as a serious WCAG 2.0 A (html-has-lang) violation.
+    assert '<html lang="en">' in body
 
 
 def test_stage2_valid_token_sets_cookie_and_redirects(

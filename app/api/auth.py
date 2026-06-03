@@ -135,7 +135,7 @@ def auth_callback(
         return HTMLResponse(
             content=(
                 "<!doctype html>"
-                '<html><head><meta charset="utf-8"><title>Signing in…</title></head>'
+                '<html lang="en"><head><meta charset="utf-8"><title>Signing in…</title></head>'
                 "<body>"
                 "<p>Signing in…</p>"
                 "<script>"

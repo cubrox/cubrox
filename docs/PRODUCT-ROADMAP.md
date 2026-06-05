@@ -14,24 +14,30 @@ based on what real users tell us works.
 - **Target**: 2026-08 to 2026-11 (3–6 months from 2026-05-01)
 - **Goal**: Deliver the core value proposition — make text easier to read
   and understand — to a first cohort of neurodivergent readers.
+- **Status (as of 2026-06-05)**: all P0 features shipped to production; the
+  app is live. Launch is now gated on the operator pre-flight, not feature
+  work — see `docs/LAUNCH-CHECKLIST.md`.
 
 ### Features
 
 | Feature                                                          | Priority | Status  |
 |------------------------------------------------------------------|----------|---------|
-| Text passage input (paste/type)                                  | P0       | Backlog |
-| Document upload (PDF)                                            | P0       | Backlog |
-| Reading-support toolkit (visual reformatting + comprehension Qs) | P0       | Backlog |
-| Email login                                                      | P0       | Backlog |
-| Saved per-user preferences                                       | P0       | Backlog |
+| Text passage input (paste/type)                                  | P0       | Shipped |
+| Document upload (PDF)                                            | P0       | Shipped |
+| Reading-support toolkit (visual reformatting + comprehension Qs) | P0       | Shipped |
+| Email login                                                      | P0       | Shipped |
+| Saved per-user preferences                                       | P0       | Shipped |
 
 ### Success Criteria
 
 - [ ] 100,000 lines of text read/processed through the product within
-      3 months of launch.
-- [ ] At least one configurable support mode per category (visual
+      3 months of launch. *(Post-launch metric; instrumented — `app.scripts.metric`.)*
+- [x] At least one configurable support mode per category (visual
       reformatting + comprehension checks) shipped and persisted per user.
 - [ ] WCAG-conformant reading surface verified by accessibility audit.
+      *(Automated axe gate green across the reading surface, login, and
+      comprehension panel; the separate human audit is still owed — see
+      `docs/LAUNCH-CHECKLIST.md` §2.B.)*
 
 ## Phase 2: Iteration
 

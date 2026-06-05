@@ -117,12 +117,19 @@ jobs:
           # provisioner) that gcloud pinned 100% to. Symptom of getting
           # this wrong: green CI, service URL serves "Hello from Cloud
           # Run!" forever. See #61 / #76.
+          #
+          # --min-instances=1 (OPS-1 #131): keep ONE warm instance in
+          # production so an idle service doesn't cold-start on the first
+          # request. Cold starts were timing out the auth callback (the
+          # 2026-06-05 synthetic-monitor failure) and blow the <100ms
+          # latency NFR. The trade-off is ~one always-on instance's cost;
+          # acceptable for launch reliability. Previews stay at 0.
           flags: |
             --service-account=${{ secrets.GCP_SERVICE_ACCOUNT }}
             --port=8080
             --memory=512Mi
             --cpu=1
-            --min-instances=0
+            --min-instances=1
             --max-instances=10
             --allow-unauthenticated
           # DATABASE_URL is set as a plain env var (not a Secret Manager

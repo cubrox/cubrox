@@ -226,6 +226,7 @@ approved, tests passing, no lint errors, PR merged to main.
 | `docs/ARTIFACT-FLOW.md` | Artifact flow diagrams and authority matrix |
 | `docs/AGENT-WORKFLOW-SUMMARY.md` | Complete workflow documentation |
 | `docs/MAINTENANCE.md` | Weekly audit and maintenance guide |
+| `docs/LAUNCH-CHECKLIST.md` | M1 go-live runbook: pre-flight gates, GO/NO-GO sign-off, incident/rollback |
 | `docs/DISTRIBUTION.md` | Framework/user-content boundary classification |
 | `docs/MEMORY-ARCHITECTURE.md` | Agent memory system: persistence types, data flow, known gaps |
 | `scripts/doctor.sh` | Local diagnostic script (standalone) |

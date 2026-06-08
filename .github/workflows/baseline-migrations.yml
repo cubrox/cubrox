@@ -1,0 +1,92 @@
+name: Baseline Production Migrations
+
+# ONE-TIME, manually triggered (workflow_dispatch).
+#
+# Production was never managed by the Supabase CLI — it has no
+# `supabase_migrations.schema_migrations` ledger (verified for OPS-3 #139),
+# so its schema has been maintained by hand (which is how BUG-4 and the
+# 2026-06-08 paste-500 happened). This registers the existing
+# supabase/migrations/*.sql as ALREADY-APPLIED, WITHOUT running them
+# (`migration repair --status applied` records the version; it does not
+# execute the SQL). After this runs once and "Verify ledger" shows every
+# migration as Applied on the remote, the `supabase db push` step that
+# deploy.yml adds (PR 2) is safe — push will see them as applied and only
+# run FUTURE migrations.
+#
+# Safe to re-run: `migration repair` is idempotent.
+#
+# Operator note: PRODUCTION_DATABASE_URL must be a connection the Supabase
+# CLI can run DDL/admin over (the direct or session-pooler connection, not
+# the transaction pooler). If "Mark existing migrations as applied" fails
+# with a connection/pooler error, provide a direct-connection URL (see the
+# README that PR 2 adds) and re-run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "baseline" to confirm registering prod migrations as applied'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: Baseline production migration ledger
+    runs-on: ubuntu-latest
+    # Don't run on the upstream template repo — only on configured forks.
+    if: github.repository != 'vibeacademy/agile-flow-gcp'
+    steps:
+      - name: Guard on confirmation
+        if: inputs.confirm != 'baseline'
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          echo "Confirmation was '${CONFIRM}', expected 'baseline' — aborting."
+          exit 1
+
+      - name: Check for DB secret
+        run: |
+          if [ -z "${{ secrets.PRODUCTION_DATABASE_URL }}" ]; then
+            echo "PRODUCTION_DATABASE_URL is not set — cannot baseline the ledger."
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Supabase CLI (pinned)
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.105.0
+
+      - name: Mark existing migrations as applied
+        env:
+          DB_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          # The URL carries the DB password — never let it surface in logs.
+          echo "::add-mask::$DB_URL"
+
+          # Repair (record as applied) every local migration version. The
+          # version is the leading timestamp of each filename. `repair`
+          # creates the supabase_migrations ledger if it doesn't exist and
+          # does NOT execute the migration SQL.
+          shopt -s nullglob
+          for f in supabase/migrations/*.sql; do
+            base="$(basename "$f")"
+            version="${base%%_*}"
+            echo "→ marking $version ($base) as applied"
+            supabase migration repair --status applied "$version" --db-url "$DB_URL"
+          done
+
+      - name: Verify ledger
+        env:
+          DB_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$DB_URL"
+          echo "Remote migration ledger after baseline (every local migration should show Applied):"
+          supabase migration list --db-url "$DB_URL"

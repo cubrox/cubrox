@@ -15,11 +15,16 @@ name: Baseline Production Migrations
 #
 # Safe to re-run: `migration repair` is idempotent.
 #
-# Operator note: PRODUCTION_DATABASE_URL must be a connection the Supabase
-# CLI can run DDL/admin over (the direct or session-pooler connection, not
-# the transaction pooler). If "Mark existing migrations as applied" fails
-# with a connection/pooler error, provide a direct-connection URL (see the
-# README that PR 2 adds) and re-run.
+# Operator note — the SUPABASE_DB_URL secret: this must be the SESSION
+# POOLER connection string, NOT the app's PRODUCTION_DATABASE_URL. The app
+# uses Supabase's direct host (db.<ref>.supabase.co), which resolves to
+# IPv6 only — Cloud Run can reach it but GitHub Actions runners are
+# IPv4-only, so the CLI gets "network is unreachable". The session pooler
+# (host aws-0-<region>.pooler.supabase.com, port 5432, user
+# postgres.<ref>) is IPv4 AND supports the session-level DDL these commands
+# need. Get it from the Supabase dashboard → Project Settings → Database →
+# Connection string → "Session pooler" (NOT "Transaction pooler"), and set
+# it as the SUPABASE_DB_URL GitHub Actions secret. PR 2's db push reuses it.
 
 on:
   workflow_dispatch:
@@ -49,8 +54,12 @@ jobs:
 
       - name: Check for DB secret
         run: |
-          if [ -z "${{ secrets.PRODUCTION_DATABASE_URL }}" ]; then
-            echo "PRODUCTION_DATABASE_URL is not set — cannot baseline the ledger."
+          if [ -z "${{ secrets.SUPABASE_DB_URL }}" ]; then
+            echo "SUPABASE_DB_URL is not set — cannot baseline the ledger."
+            echo "Set it to the SESSION POOLER connection string (IPv4): Supabase"
+            echo "dashboard → Project Settings → Database → Connection string →"
+            echo "Session pooler. The app's PRODUCTION_DATABASE_URL is the direct"
+            echo "(IPv6) host and is unreachable from GitHub Actions runners."
             exit 1
           fi
 
@@ -64,7 +73,7 @@ jobs:
 
       - name: Mark existing migrations as applied
         env:
-          DB_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
           # The URL carries the DB password — never let it surface in logs.
@@ -84,7 +93,7 @@ jobs:
 
       - name: Verify ledger
         env:
-          DB_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
           echo "::add-mask::$DB_URL"

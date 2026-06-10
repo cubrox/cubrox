@@ -115,7 +115,9 @@ jobs:
           set -euo pipefail
           # URL carries the DB password — keep it out of the logs.
           echo "::add-mask::$DB_URL"
-          supabase db push --db-url "$DB_URL"
+          # --yes auto-answers the interactive "push these migrations?"
+          # prompt so the step can never hang on stdin in CI.
+          supabase db push --yes --db-url "$DB_URL"
 
       - name: Build and push container
         if: steps.check_secrets.outputs.skip != 'true'

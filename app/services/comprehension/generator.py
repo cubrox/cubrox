@@ -31,30 +31,27 @@ from app.services.comprehension.prompts import PROMPT_VERSION, SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
-# Max chars sent to the LLM. ~4 chars per token is a conservative estimate
-# for Claude on English text, so 16_000 chars ≈ 4_000 input tokens. The
-# passage-ingestion route already caps at 100_000 chars per the INGEST-1
-# guardrails, so passages between these two limits are the over-budget
-# ones we reject here.
+# Max chars sent to the LLM per generation. ~4 chars per token, so 16_000
+# chars ≈ 4_000 input tokens — the cost bound. A passage longer than this is
+# TRUNCATED to this many chars (at a word boundary) for question generation
+# rather than rejected: comprehension questions about the opening of a long
+# passage beat no questions at all (and INGEST-3 already splits big documents
+# into parts). Cost stays bounded because we never send more than this.
 MAX_INPUT_CHARS = 16_000
 
 DEFAULT_MAX_TOKENS = 1024
 
 
-class PassageTooLongError(Exception):
-    """The passage exceeds the LLM input-cap. Caller surfaces a UX hint.
-
-    Distinct from GeneratorError because this is a recoverable, user-
-    actionable condition (split the passage), not a system failure.
-    """
-
-    def __init__(self, char_count: int, max_chars: int = MAX_INPUT_CHARS) -> None:
-        super().__init__(
-            f"Passage is {char_count:,} chars; max for comprehension questions "
-            f"is {max_chars:,}. Try splitting it."
-        )
-        self.char_count = char_count
-        self.max_chars = max_chars
+def _truncate_for_llm(text: str) -> str:
+    """Cap `text` at MAX_INPUT_CHARS for question generation, trimming back to
+    the last word boundary so we don't cut a word in half."""
+    if len(text) <= MAX_INPUT_CHARS:
+        return text
+    cut = text[:MAX_INPUT_CHARS]
+    space = cut.rfind(" ")
+    # Only honor the boundary if it doesn't lop off most of the budget (a
+    # passage with no spaces in the first 16k just gets a hard cut).
+    return cut[:space] if space > MAX_INPUT_CHARS // 2 else cut
 
 
 class GeneratorError(Exception):
@@ -97,9 +94,10 @@ def generate_questions(
     """Return cached or freshly-generated comprehension questions.
 
     Order of operations (the cost-containment contract):
-      1. SHA-256 the passage text.
+      1. SHA-256 the passage text (the cache key is the FULL text).
       2. Look up the cache. On hit, return immediately. No LLM call.
-      3. On miss, length-check. Over MAX_INPUT_CHARS → PassageTooLongError.
+      3. On miss, truncate the input to MAX_INPUT_CHARS (bounds token cost;
+         a long passage still gets questions about its opening).
       4. Call Anthropic with the system prompt under cache_control
          ephemeral. Parse + validate the JSON response.
       5. Persist to cache. Return.
@@ -128,16 +126,10 @@ def generate_questions(
         )
         return cached
 
-    if len(passage_text) > MAX_INPUT_CHARS:
-        logger.info(
-            "comprehension passage too long",
-            extra={
-                "text_hash": text_hash.hex(),
-                "char_count": len(passage_text),
-                "max_chars": MAX_INPUT_CHARS,
-            },
-        )
-        raise PassageTooLongError(char_count=len(passage_text))
+    # Long passages are truncated (not rejected) so they still get questions
+    # while keeping the per-call token cost bounded. The cache key is the FULL
+    # passage hash, so the same passage always yields the same questions.
+    llm_input = _truncate_for_llm(passage_text)
 
     logger.info(
         "comprehension cache miss → calling Anthropic",
@@ -147,6 +139,8 @@ def generate_questions(
             "model_id": model_id,
             "prompt_version": PROMPT_VERSION,
             "char_count": len(passage_text),
+            "input_chars": len(llm_input),
+            "truncated": len(llm_input) < len(passage_text),
         },
     )
 
@@ -161,7 +155,7 @@ def generate_questions(
                     "cache_control": {"type": "ephemeral"},
                 }
             ],
-            messages=[{"role": "user", "content": passage_text}],
+            messages=[{"role": "user", "content": llm_input}],
         )
     except anthropic.AnthropicError as exc:
         # Auth failure (missing/invalid key), bad model id, rate limit,

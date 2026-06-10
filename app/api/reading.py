@@ -35,7 +35,6 @@ from app.models.reading_event import ReadingEvent
 from app.services.comprehension.client import get_anthropic_client
 from app.services.comprehension.generator import (
     GeneratorError,
-    PassageTooLongError,
     generate_questions,
 )
 from app.services.reading.defaults import with_defaults
@@ -200,7 +199,7 @@ def passage_questions(
 
     Three response shapes (all 200, all HTML fragments):
       - Success → questions list inside <section aria-label="...">
-      - PassageTooLongError → friendly "split it" message
+      - disabled (comprehension off for this passage) → off message
       - GeneratorError → "temporarily unavailable" message (logged WARN)
 
     Owner check mirrors GET /read: cross-user passage and nonexistent
@@ -235,10 +234,6 @@ def passage_questions(
             model_id=settings.anthropic_model,
             session=session,
         )
-    except PassageTooLongError:
-        # User-recoverable: tell them to split. NOT logged at WARN
-        # because it's expected behaviour on long passages.
-        error = "too_long"
     except GeneratorError:
         # System-side: log so we can investigate, surface a friendly
         # message to the user. NEVER 500 because comprehension is a

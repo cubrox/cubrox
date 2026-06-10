@@ -252,3 +252,80 @@ def test_invalid_uuid_returns_422(client: TestClient, session: Session) -> None:
     signed_in(session)
     response = client.get("/read/not-a-uuid")
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Multi-part document navigation (INGEST-3 #145)
+# ---------------------------------------------------------------------------
+
+
+def _make_document(session: Session, owner_id: uuid.UUID, n_parts: int) -> list[Passage]:
+    """Create `n_parts` linked passages sharing one document_id."""
+    document_id = uuid.uuid4()
+    parts: list[Passage] = []
+    for i in range(n_parts):
+        text = f"Part {i} body text."
+        p = Passage(
+            owner_id=owner_id,
+            text=text,
+            text_hash=hashlib.sha256(text.encode("utf-8")).digest(),
+            source_type="pdf",
+            source_filename="big.pdf",
+            document_id=document_id,
+            part_index=i,
+            part_count=n_parts,
+        )
+        session.add(p)
+        parts.append(p)
+    session.commit()
+    for p in parts:
+        session.refresh(p)
+    return parts
+
+
+def test_middle_part_shows_position_and_both_nav_links(
+    client: TestClient, session: Session
+) -> None:
+    user = signed_in(session)
+    parts = _make_document(session, user.id, 3)
+
+    body = client.get(f"/read/{parts[1].id}").text
+
+    assert 'aria-label="Document parts"' in body
+    assert "Part 2 of 3" in body
+    assert f"/read/{parts[0].id}" in body  # Previous
+    assert f"/read/{parts[2].id}" in body  # Next
+
+
+def test_first_part_has_next_but_no_previous(client: TestClient, session: Session) -> None:
+    user = signed_in(session)
+    parts = _make_document(session, user.id, 3)
+
+    body = client.get(f"/read/{parts[0].id}").text
+
+    assert "Part 1 of 3" in body
+    assert "Next part" in body
+    assert f"/read/{parts[1].id}" in body
+    assert "Previous part" not in body
+
+
+def test_last_part_has_previous_but_no_next(client: TestClient, session: Session) -> None:
+    user = signed_in(session)
+    parts = _make_document(session, user.id, 3)
+
+    body = client.get(f"/read/{parts[2].id}").text
+
+    assert "Part 3 of 3" in body
+    assert "Previous part" in body
+    assert f"/read/{parts[1].id}" in body
+    assert "Next part" not in body
+
+
+def test_standalone_passage_has_no_part_nav(client: TestClient, session: Session) -> None:
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    body = client.get(f"/read/{passage.id}").text
+
+    assert 'aria-label="Document parts"' not in body
+    assert "Part 1 of 1" not in body

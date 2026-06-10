@@ -16,6 +16,7 @@ import subprocess
 import uuid
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -195,3 +196,27 @@ def test_no_pymupdf_or_fitz_import_in_app() -> None:
     )
     # grep returns 1 when no matches are found — that's what we want.
     assert result.returncode == 1, f"Forbidden PyMuPDF import detected:\n{result.stdout}"
+
+
+def test_over_cap_pdf_auto_splits_instead_of_truncating(
+    client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """INGEST-3 (#145): a large PDF is split into linked parts (no content
+    lost) — replacing the old silent truncation to MAX_TEXT_LEN."""
+    signed_in(session)
+    big_text = "p" * 250_000  # ~3 parts at the 80k target
+    monkeypatch.setattr("app.api.passages.extract_text", lambda _b: big_text)
+
+    response = client.post(
+        "/passages/pdf",
+        files={"file": ("big.pdf", io.BytesIO(b"%PDF-1.4 dummy"), "application/pdf")},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+
+    rows = session.exec(select(Passage).order_by(Passage.part_index)).all()
+    assert len(rows) >= 2
+    assert all(r.source_type == "pdf" and r.source_filename == "big.pdf" for r in rows)
+    assert {r.part_count for r in rows} == {len(rows)}
+    # Nothing truncated — the parts reproduce the full extracted text.
+    assert "".join(r.text for r in rows) == big_text

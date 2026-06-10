@@ -1,0 +1,13 @@
+{% if nav %}
+  <nav class="part-nav" aria-label="Document parts">
+    <p class="part-position">Part {{ nav.part_index + 1 }} of {{ nav.part_count }}</p>
+    <div class="part-links">
+      {% if nav.prev_id %}
+        <a href="/read/{{ nav.prev_id }}" rel="prev"><span aria-hidden="true">&larr;</span> Previous part</a>
+      {% endif %}
+      {% if nav.next_id %}
+        <a href="/read/{{ nav.next_id }}" rel="next">Next part <span aria-hidden="true">&rarr;</span></a>
+      {% endif %}
+    </div>
+  </nav>
+{% endif %}

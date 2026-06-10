@@ -88,12 +88,32 @@ def read_passage(
     stored_pref = session.get(Preference, user.id)
     prefs = with_defaults(stored_pref.values if stored_pref else None)
 
+    # INGEST-3 (#145): if this passage is one part of an auto-split document,
+    # build Prev/Next links to its sibling parts so the reader can move
+    # through the whole document. Standalone passages get no nav.
+    nav: dict[str, Any] | None = None
+    if passage.document_id is not None and passage.part_count > 1:
+        siblings = session.exec(
+            select(Passage).where(
+                Passage.document_id == passage.document_id,  # type: ignore[arg-type]
+                Passage.owner_id == user.id,  # type: ignore[arg-type]
+            )
+        ).all()
+        by_index = {p.part_index: p.id for p in siblings}
+        nav = {
+            "part_index": passage.part_index,
+            "part_count": passage.part_count,
+            "prev_id": by_index.get(passage.part_index - 1),
+            "next_id": by_index.get(passage.part_index + 1),
+        }
+
     return templates.TemplateResponse(
         request=request,
         name="pages/reading.html",
         context={
             "passage": passage,
             "prefs": prefs,
+            "nav": nav,
             "preference_options": PREFERENCE_OPTIONS,
             "label_for": label_for,
             "label_for_key": label_for_key,

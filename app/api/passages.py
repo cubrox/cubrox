@@ -15,6 +15,7 @@ bytes — the cache is keyed on what the user reads, not how it arrived.
 """
 
 import hashlib
+import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -25,6 +26,7 @@ from app.db import get_session
 from app.integrations.supabase.auth import current_user
 from app.models.passage import Passage
 from app.services.ingestion.pdf import EmptyPdfTextError, PdfParseError, extract_text
+from app.services.ingestion.split import MAX_PARTS, split_into_parts
 from app.templates import templates
 
 router = APIRouter()
@@ -47,6 +49,56 @@ EMPTY_PDF_MESSAGE = (
 )
 
 
+def _persist_as_passages(
+    *,
+    session: Session,
+    owner_id: uuid.UUID,
+    text: str,
+    source_type: str,
+    source_filename: str | None,
+) -> Passage:
+    """Persist `text` as one passage, or — if it's over MAX_TEXT_LEN — as an
+    ordered set of linked parts (INGEST-3 #145). Returns the FIRST passage
+    (part 0), which the caller redirects to.
+
+    Text within the cap stays a standalone passage (document_id=None) exactly
+    as before. Over the cap, it's split into <= MAX_TEXT_LEN-render-safe parts
+    that share one document_id; the reading view links them with Prev/Next.
+    """
+    if len(text) <= MAX_TEXT_LEN:
+        parts = [text]
+    else:
+        parts = split_into_parts(text)
+
+    if len(parts) > MAX_PARTS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Document is too large to ingest, even split into parts (>{MAX_PARTS}).",
+        )
+
+    document_id = uuid.uuid4() if len(parts) > 1 else None
+    part_count = len(parts)
+    first: Passage | None = None
+    for index, part_text in enumerate(parts):
+        passage = Passage(
+            owner_id=owner_id,
+            text=part_text,
+            text_hash=hashlib.sha256(part_text.encode("utf-8")).digest(),
+            source_type=source_type,
+            source_filename=source_filename,
+            document_id=document_id,
+            part_index=index,
+            part_count=part_count,
+        )
+        session.add(passage)
+        if index == 0:
+            first = passage
+    session.commit()
+    assert first is not None  # parts is always non-empty
+    session.refresh(first)
+    return first
+
+
 @router.get("/passages/new", response_class=HTMLResponse)
 def new_passage_form(request: Request, user: CurrentUser) -> HTMLResponse:
     """Render the paste-text form."""
@@ -65,35 +117,25 @@ def create_passage(
 ) -> RedirectResponse:
     """Persist the pasted text and redirect to the reading view.
 
-    Validation rules (per ticket guardrails):
-      - 1 <= len(text) <= MAX_TEXT_LEN
-      - text_hash = SHA-256 of the EXACT submitted bytes (no strip,
+    Validation rules:
+      - text is non-empty
+      - over MAX_TEXT_LEN, the text is auto-split into linked parts
+        (INGEST-3 #145) rather than rejected
+      - each part's text_hash = SHA-256 of its EXACT bytes (no strip,
         no lowercase) so cross-user cache hits work
       - source_type='paste', source_filename=None
     """
     if len(text) == 0:
         raise HTTPException(status_code=422, detail="Text is required")
-    if len(text) > MAX_TEXT_LEN:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Passage exceeds {MAX_TEXT_LEN:,}-character limit",
-        )
 
-    text_hash = hashlib.sha256(text.encode("utf-8")).digest()
-    passage = Passage(
+    first = _persist_as_passages(
+        session=session,
         owner_id=user.id,
         text=text,
-        text_hash=text_hash,
         source_type="paste",
         source_filename=None,
     )
-    session.add(passage)
-    session.commit()
-    session.refresh(passage)
-
-    # /read/{id} ships in READ-1 (#15). Until then this redirect lands
-    # on a 404 — the URL shape is what matters for downstream wiring.
-    return RedirectResponse(url=f"/read/{passage.id}", status_code=303)
+    return RedirectResponse(url=f"/read/{first.id}", status_code=303)
 
 
 @router.post("/passages/pdf")
@@ -138,19 +180,13 @@ async def create_passage_from_pdf(
     except (PdfParseError, EmptyPdfTextError):
         raise HTTPException(status_code=422, detail=EMPTY_PDF_MESSAGE) from None
 
-    if len(text) > MAX_TEXT_LEN:
-        text = text[:MAX_TEXT_LEN]
-
-    text_hash = hashlib.sha256(text.encode("utf-8")).digest()
-    passage = Passage(
+    # Over the cap, auto-split into linked parts (INGEST-3 #145) instead of
+    # silently truncating to MAX_TEXT_LEN — a large PDF reads in full.
+    first = _persist_as_passages(
+        session=session,
         owner_id=user.id,
         text=text,
-        text_hash=text_hash,
         source_type="pdf",
         source_filename=file.filename,
     )
-    session.add(passage)
-    session.commit()
-    session.refresh(passage)
-
-    return RedirectResponse(url=f"/read/{passage.id}", status_code=303)
+    return RedirectResponse(url=f"/read/{first.id}", status_code=303)

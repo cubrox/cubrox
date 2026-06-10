@@ -95,11 +95,46 @@ def test_text_at_limit_succeeds(client: TestClient, session: Session) -> None:
     assert response.status_code == 303
 
 
-def test_text_over_limit_returns_422(client: TestClient, session: Session) -> None:
-    signed_in(session)
-    text = "a" * 100_001
+def test_text_over_limit_auto_splits_into_linked_parts(
+    client: TestClient, session: Session
+) -> None:
+    """INGEST-3 (#145): over-cap text is auto-split into linked parts instead
+    of rejected. Redirects to part 0; the parts share a document_id, are
+    ordered, and concatenate back to the original (no loss)."""
+    user = signed_in(session)
+    text = "a" * 100_001  # just over MAX_TEXT_LEN → 2 parts at the 80k target
     response = client.post("/passages", data={"text": text}, follow_redirects=False)
-    assert response.status_code == 422
+    assert response.status_code == 303
+
+    rows = session.exec(
+        select(Passage).where(Passage.owner_id == user.id).order_by(Passage.part_index)  # type: ignore[arg-type]
+    ).all()
+    assert len(rows) == 2
+    assert {r.part_index for r in rows} == {0, 1}
+    assert all(r.part_count == 2 for r in rows)
+    # All parts belong to the same (non-null) document.
+    doc_ids = {r.document_id for r in rows}
+    assert len(doc_ids) == 1 and None not in doc_ids
+    # No text lost or reordered.
+    assert "".join(r.text for r in rows) == text
+    # Redirect lands on part 0.
+    assert response.headers["location"] == f"/read/{rows[0].id}"
+
+
+def test_text_at_limit_stays_a_single_standalone_passage(
+    client: TestClient, session: Session
+) -> None:
+    """At/under the cap, behavior is unchanged: one standalone passage with
+    document_id=None and part_count=1 (no nav)."""
+    user = signed_in(session)
+    text = "a" * 100_000
+    client.post("/passages", data={"text": text}, follow_redirects=False)
+
+    rows = session.exec(select(Passage).where(Passage.owner_id == user.id)).all()  # type: ignore[arg-type]
+    assert len(rows) == 1
+    assert rows[0].document_id is None
+    assert rows[0].part_count == 1
+    assert rows[0].part_index == 0
 
 
 # ---------------------------------------------------------------------------

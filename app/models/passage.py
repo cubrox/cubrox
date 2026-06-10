@@ -35,4 +35,11 @@ class Passage(SQLModel, table=True):
     # can disable questions for a passage where the auto-generated ones are
     # unhelpful (PRD Risk #2 mitigation for sacred/poetic text).
     comprehension_enabled: bool = Field(default=True, nullable=False)
+    # INGEST-3 (#145): documents larger than MAX_TEXT_LEN are auto-split into
+    # ordered parts that share a `document_id`, so a big PDF reads as a
+    # navigable sequence instead of being truncated or rejected. A standalone
+    # passage has document_id=None, part_index=0, part_count=1.
+    document_id: uuid.UUID | None = Field(default=None, index=True)
+    part_index: int = Field(default=0, nullable=False)
+    part_count: int = Field(default=1, nullable=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

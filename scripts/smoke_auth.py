@@ -24,6 +24,12 @@ that hits the *real* deployed URL with a *real* Supabase session can.
    - `GET /passages/new` (cookie attached) → expect 200 + the authed page.
    - `GET /passages/new` again → still 200, proving the session persists across
      reloads.
+   - `POST /passages` (paste text) → expect a 303 to `/read/<id>`, then
+     `GET /read/<id>` → 200 with the pasted text rendered. This is the WRITE
+     path (OPS-4 #143): it INSERTs a row and reads it back, catching the
+     "green CI, broken prod" failures that auth-only probing misses (BUG-4,
+     the paste-500). The passage is owned by the throwaway user, so it is
+     removed by the same cleanup (FK `ON DELETE CASCADE`).
    - `GET /logout` → expect a 303 to `/` that clears the cookie.
    - `GET /passages/new` (cookie now gone) → expect a 303 back to `/`, proving
      the session is actually gone.
@@ -155,7 +161,7 @@ def sign_in(anon: Client, email: str, password: str) -> tuple[str, str]:
 
 
 def run_flow(base_url: str, access_token: str, refresh_token: str) -> None:
-    """Drive the live app through callback → authed page → reload → logout.
+    """Drive the live app through callback → authed page → reload → paste → read → logout.
 
     Raises SmokeFailure on the first deviation from the expected contract.
     """
@@ -197,6 +203,41 @@ def run_flow(base_url: str, access_token: str, refresh_token: str) -> None:
             raise SmokeFailure(
                 f"session did not persist across reload: {AUTHED_ENTRY_PATH} returned "
                 f"{reload_resp.status_code}, expected 200"
+            )
+
+        # Write path (OPS-4 #143). Both 2026-06 prod incidents — BUG-4 and the
+        # paste-500 (a migration column that never reached prod) — were "green
+        # CI, broken prod" precisely because nothing exercised a real DB write.
+        # Auth alone never touches the `passage` table; this does.
+        _step("POST /passages — paste a passage (write path), expect 303 to /read/<id>")
+        marker = "smokewrite" + uuid.uuid4().hex[:12]
+        passage_text = (
+            f"{marker} — synthetic write-path check from scripts/smoke_auth.py. "
+            "Created and removed with the throwaway user (passage.owner_id "
+            "cascades on user delete)."
+        )
+        paste = client.post(f"{base}/passages", data={"text": passage_text})
+        if paste.status_code != 303:
+            raise SmokeFailure(
+                f"POST /passages returned {paste.status_code}, expected 303 "
+                "(the BUG-4 / paste-500 class of failure — a broken DB write path)"
+            )
+        read_path = paste.headers.get("location", "")
+        if not read_path.startswith("/read/"):
+            raise SmokeFailure(f"POST /passages redirected to {read_path!r}, expected /read/<id>")
+
+        # A plain HTTP client doesn't run HTMX, so the reading view's lazy-loaded
+        # questions panel never fires — no comprehension LLM spend from this probe.
+        _step("GET /read/<id> — expect 200 with the pasted text rendered")
+        reading = client.get(f"{base}{read_path}")
+        if reading.status_code != 200:
+            raise SmokeFailure(
+                f"{read_path} returned {reading.status_code} while authed, expected 200"
+            )
+        if marker not in reading.text:
+            raise SmokeFailure(
+                f"{read_path} did not render the pasted marker {marker!r} — the reading "
+                "view did not show the new passage"
             )
 
         _step("GET /logout — expect 303 to / and a cleared session cookie")
@@ -268,7 +309,10 @@ def main() -> int:
             except Exception as exc:  # noqa: BLE001 — cleanup must never mask the real result
                 print(f"WARN: failed to delete throwaway user {user_id}: {exc}", flush=True)
 
-    print("PASS: magic-link session → authed page → reload → logout all verified", flush=True)
+    print(
+        "PASS: session → authed page → reload → paste → read → logout all verified",
+        flush=True,
+    )
     return 0
 
 

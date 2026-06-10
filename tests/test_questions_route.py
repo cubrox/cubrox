@@ -8,7 +8,7 @@ Covers the Definition of Done from issue #20 (COMP-3):
   - Nonexistent passage → 404
   - Both 404 paths return identical body (no existence leak)
   - Route invokes generator.generate_questions with question_type="recall"
-  - PassageTooLongError → 200 with the "too long" fragment
+  - GeneratorError → 200 with the "temporarily unavailable" fragment
   - GeneratorError → 200 with the "unavailable" fragment + WARN log
   - Unauthenticated request → 200 + HX-Redirect: /login (per AUTH-3)
   - The Anthropic client is never the real client in tests
@@ -224,33 +224,8 @@ def test_other_user_and_nonexistent_have_identical_response_shape(
 
 
 # ---------------------------------------------------------------------------
-# Error states — too long + unavailable
+# Error states — unavailable
 # ---------------------------------------------------------------------------
-
-
-def test_passage_too_long_returns_200_with_friendly_fragment(
-    client: TestClient,
-    session: Session,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A PassageTooLongError from the generator must render as a friendly
-    200 fragment, NOT a 4xx/5xx. Comprehension is a feature, not a hard
-    dependency on every passage."""
-    user = signed_in(session)
-    passage = _make_passage(session, user.id)
-
-    def fake_generate(**_: Any) -> list[dict]:
-        raise generator.PassageTooLongError(char_count=20_000)
-
-    monkeypatch.setattr("app.api.reading.generate_questions", fake_generate)
-
-    response = client.get(f"/passages/{passage.id}/questions")
-    assert response.status_code == 200
-    body = response.text
-    assert "too long" in body.lower()
-    # Still wrapped in the comprehension-check section so the rest of
-    # the page's structure / a11y is consistent.
-    assert '<section aria-label="Comprehension check"' in body
 
 
 def test_generator_error_returns_200_with_unavailable_fragment(

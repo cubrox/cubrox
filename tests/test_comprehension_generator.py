@@ -4,7 +4,7 @@ Covers the Definition of Done from issue #19 (COMP-2):
   - Cache hit returns immediately without invoking the Anthropic client
   - Cache miss calls Anthropic exactly once, persists to cache, returns parsed list
   - Second call with the same text after a miss is a cache hit
-  - Passage exceeding 16,000 chars raises PassageTooLongError BEFORE the LLM call
+  - Passage exceeding 16,000 chars is truncated for the LLM call (not rejected)
   - The call to messages.create uses cache_control={'type': 'ephemeral'} on the system message
   - The call uses model=settings.anthropic_model
   - Malformed JSON response raises GeneratorError
@@ -29,7 +29,6 @@ from app.services.comprehension import cache, generator
 from app.services.comprehension.generator import (
     MAX_INPUT_CHARS,
     GeneratorError,
-    PassageTooLongError,
     generate_questions,
 )
 from app.services.comprehension.prompts import PROMPT_VERSION
@@ -198,28 +197,31 @@ def test_passage_at_input_cap_succeeds(session: Session) -> None:
     assert len(result) == 3
 
 
-def test_passage_over_input_cap_raises_and_does_not_call_anthropic(
-    session: Session,
-) -> None:
-    """The cost-prevention property: a too-long passage raises BEFORE the
-    LLM is invoked, AND BEFORE writing anything to the cache. Pinned by
-    asserting both side effects didn't happen."""
+def test_passage_over_input_cap_truncates_and_still_generates(session: Session) -> None:
+    """A passage longer than MAX_INPUT_CHARS is TRUNCATED for the LLM call
+    (token cost stays bounded) and still produces questions — it is no longer
+    rejected. The cache key remains the FULL passage text."""
     client = _make_mock_client()
-    passage = "a" * (MAX_INPUT_CHARS + 1)
+    passage = "word " * 5000  # ~25k chars, well over the 16k cap
 
-    with pytest.raises(PassageTooLongError) as exc_info:
-        generate_questions(
-            passage_text=passage,
-            question_type="recall",
-            client=client,
-            model_id=TEST_MODEL_ID,
-            session=session,
-        )
+    result = generate_questions(
+        passage_text=passage,
+        question_type="recall",
+        client=client,
+        model_id=TEST_MODEL_ID,
+        session=session,
+    )
 
-    assert client.messages.create.call_count == 0
-    assert exc_info.value.char_count == MAX_INPUT_CHARS + 1
+    # Generated (not rejected), exactly one call.
+    assert client.messages.create.call_count == 1
+    assert len(result) == 3
 
-    # No cache row was written.
+    # The content sent to the LLM was capped at MAX_INPUT_CHARS (truncated).
+    sent = client.messages.create.call_args.kwargs["messages"][0]["content"]
+    assert len(sent) <= MAX_INPUT_CHARS
+    assert len(sent) < len(passage)
+
+    # Cached under the FULL passage hash so re-reads are free.
     text_hash = hashlib.sha256(passage.encode("utf-8")).digest()
     assert (
         cache.get_cached(
@@ -229,7 +231,7 @@ def test_passage_over_input_cap_raises_and_does_not_call_anthropic(
             prompt_version=PROMPT_VERSION,
             session=session,
         )
-        is None
+        == result
     )
 
 
@@ -516,23 +518,24 @@ def test_passage_text_never_appears_in_logs(
     assert sensitive_phrase not in caplog.text
 
 
-def test_passage_too_long_log_does_not_include_passage(
+def test_truncated_long_passage_log_does_not_include_passage(
     session: Session, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """The 'too long' log line records char count but never the text."""
+    """The cache-miss/truncation log line records char counts but never the
+    passage text — even now that a long passage is truncated and generated
+    rather than rejected."""
     client = _make_mock_client()
     sensitive_marker = "THIS_IS_THE_SECRET_MARKER"
-    passage = sensitive_marker + ("a" * (MAX_INPUT_CHARS + 1))
+    passage = sensitive_marker + (" a" * 12_000)  # well over the cap
 
     with caplog.at_level(logging.DEBUG):
-        with pytest.raises(PassageTooLongError):
-            generate_questions(
-                passage_text=passage,
-                question_type="recall",
-                client=client,
-                model_id=TEST_MODEL_ID,
-                session=session,
-            )
+        generate_questions(
+            passage_text=passage,
+            question_type="recall",
+            client=client,
+            model_id=TEST_MODEL_ID,
+            session=session,
+        )
 
     assert sensitive_marker not in caplog.text
 

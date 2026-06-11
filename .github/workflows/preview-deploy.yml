@@ -57,19 +57,14 @@ jobs:
         if: steps.check_secrets.outputs.skip != 'true'
         uses: actions/checkout@v6
 
-      # Preview-DB plumbing: SUPA-4 (#83) removed the per-PR Neon branch
-      # creation step that used to live here. Schema migrations for
-      # preview now run via the Supabase GitHub App auto-branching
-      # integration (per SUPA-1 / #80), which spins up a Supabase
-      # Postgres branch per PR + applies the supabase/migrations/*.sql
-      # against it without any workflow plumbing on our side.
-      #
-      # The Cloud Run preview revision deployed below uses the same
-      # DATABASE_URL as production for now (pre-launch shared DB is
-      # acceptable). When usage grows, file a follow-up to inject the
-      # per-PR Supabase branch URL via `supabase branches get pr-N`
-      # in this workflow — requires a SUPABASE_ACCESS_TOKEN secret
-      # the operator hasn't yet provisioned.
+      # Preview-DB plumbing (#99): the Supabase GitHub App auto-branches
+      # only on PRs that change supabase/migrations/** — those get an
+      # isolated Postgres branch (its own project) with migrations applied.
+      # The deploy step below looks the branch up by git ref and injects its
+      # DATABASE_URL so the preview never touches PRODUCTION data. PRs with
+      # no migration change have no branch and keep the shared prod DB (their
+      # schema is identical to prod anyway). Any lookup failure falls back to
+      # prod — isolation is best-effort, never deploy-breaking.
 
       # ── GCP: auth and build image ─────────────────────────────────────
 
@@ -103,6 +98,13 @@ jobs:
           docker push "$IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
+      # Pinned CLI for the per-PR branch lookup in the deploy step (#99).
+      - name: Install Supabase CLI (pinned)
+        if: steps.check_secrets.outputs.skip != 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.105.0
+
       # ── Deploy as a Cloud Run revision tag with zero traffic ──────────
       #
       # The --tag=pr-N flag creates a stable URL for this PR without
@@ -111,17 +113,60 @@ jobs:
       - name: Deploy preview revision
         if: steps.check_secrets.outputs.skip != 'true'
         id: deploy
+        env:
+          # Authenticates the Supabase CLI for the per-PR branch lookup (#99).
+          # Absent on forks → the lookup is skipped and prod is used.
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          # Build the runtime env var list. DATABASE_URL points at the
-          # production Supabase Postgres for preview deploys too — this
-          # is acceptable pre-launch where there's no real prod data to
-          # contaminate. When usage grows, swap to a per-PR Supabase
-          # branch URL via `supabase branches get pr-${PR_NUMBER}`.
-          # The ^;^ prefix changes gcloud's KEY=val separator from comma
-          # to ';' (URL passwords often contain commas).
+          # ── Resolve the preview DATABASE_URL (#99) ──────────────────────
+          # Prefer this PR's isolated Supabase preview branch so the preview
+          # can't touch PRODUCTION data. Branches exist only for PRs that
+          # change supabase/migrations/**; otherwise (or on any failure) we
+          # keep the shared prod DB. Done inside this step so the URL never
+          # lands in a step output. GITHUB_HEAD_REF is the PR's source branch.
+          DB_URL="${{ secrets.PRODUCTION_DATABASE_URL }}"
+          DB_SOURCE="production (shared)"
+          REF="gnswmcgaztcxslirulwm"
+          if [ -n "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            # The branch is provisioned asynchronously on PR open, but the
+            # deploy step runs many minutes later (after the ci job + image
+            # build), so it's almost always ready. One short retry covers the
+            # rare race; a non-migration PR (no branch) costs at most ~10s.
+            BRANCH_NAME=""
+            for attempt in 1 2; do
+              BRANCHES=$(supabase branches list --project-ref "$REF" -o json 2>/dev/null || echo '[]')
+              BRANCH_NAME=$(printf '%s' "$BRANCHES" \
+                | jq -r --arg g "${GITHUB_HEAD_REF:-}" 'map(select(.git_branch == $g)) | .[0].name // empty' 2>/dev/null || true)
+              if [ -n "$BRANCH_NAME" ] || [ "$attempt" = "2" ]; then break; fi
+              echo "No preview branch yet for '${GITHUB_HEAD_REF:-}'; retrying in 10s..."
+              sleep 10
+            done
+            if [ -n "$BRANCH_NAME" ]; then
+              echo "Found Supabase preview branch '$BRANCH_NAME' for ref '${GITHUB_HEAD_REF:-}'."
+              ENV_OUT=$(supabase branches get "$BRANCH_NAME" --project-ref "$REF" -o env 2>/dev/null || true)
+              # Diagnostic: which keys came back (names only, never values).
+              echo "branches-get keys: $(printf '%s' "$ENV_OUT" | cut -d= -f1 | tr '\n' ' ')"
+              BRANCH_URL=$(printf '%s' "$ENV_OUT" | sed -n 's/^POSTGRES_URL=//p' | head -n1 | sed -e 's/^"//' -e 's/"$//')
+              if [ -n "$BRANCH_URL" ]; then
+                DB_URL="$BRANCH_URL"
+                DB_SOURCE="Supabase preview branch (isolated)"
+              else
+                echo "WARN: no POSTGRES_URL from branches get — falling back to shared prod DB."
+              fi
+            else
+              echo "No Supabase preview branch for this PR (non-migration change) — using shared prod DB."
+            fi
+          fi
+          echo "::add-mask::$DB_URL"
+          echo "Preview database: $DB_SOURCE"
+          echo "db_source=$DB_SOURCE" >> "$GITHUB_OUTPUT"
+
+          # Build the runtime env var list. The ^;^ prefix changes gcloud's
+          # KEY=val separator from comma to ';' (URL passwords often contain
+          # commas).
           ENV_VARS="^;^ENVIRONMENT=preview;PR_NUMBER=${{ env.PR_NUMBER }}"
-          if [ -n "${{ secrets.PRODUCTION_DATABASE_URL }}" ]; then
-            ENV_VARS="${ENV_VARS};DATABASE_URL=${{ secrets.PRODUCTION_DATABASE_URL }}"
+          if [ -n "$DB_URL" ]; then
+            ENV_VARS="${ENV_VARS};DATABASE_URL=${DB_URL}"
           fi
 
           # --service-account pins the runtime SA to the deployer SA so
@@ -233,12 +278,14 @@ jobs:
           script: |
             const previewUrl = '${{ steps.deploy.outputs.preview_url }}';
             const smoke = '${{ steps.smoke_test.outputs.result }}';
+            const dbSource = '${{ steps.deploy.outputs.db_source }}';
 
             let body = '## Preview Deployment\n\n';
             body += '| Component | Status |\n';
             body += '|-----------|--------|\n';
             body += `| Preview URL | ${previewUrl || 'Not deployed'} |\n`;
             body += `| Cloud Run tag | \`pr-${{ env.PR_NUMBER }}\` |\n`;
+            body += `| Database | ${dbSource || 'unknown'} |\n`;
             body += `| Smoke test | ${smoke === 'passed' ? 'Passed' : smoke === 'failed' ? 'Failed' : 'Skipped'} |\n\n`;
 
             if (previewUrl && smoke === 'passed') {

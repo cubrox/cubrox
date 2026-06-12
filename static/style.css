@@ -47,24 +47,48 @@
    <button> is one allow-listed option. aria-pressed reflects the
    current value at page load. */
 .reader-controls {
-  max-width: var(--reader-max-width, 33em);
+  /* Wider than the reading column so the preference groups can lay out as a
+     grid instead of one tall stack. Capped and centered. */
+  max-width: min(56rem, 100%);
   margin: 2rem auto;
 }
 
+.reader-controls-panel > summary {
+  font-size: 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 0.75rem;
+}
+
+/* Arrange the preference groups in a responsive grid (auto-fit columns) so
+   they don't stack into one tall column. */
+.reader-control-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1rem 1.5rem;
+}
+
 .reader-control-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 1rem;
+  /* Each group is a grid cell: label on its own line, option buttons
+     wrapping below. min-width:0 lets a cell shrink instead of overflowing. */
   border: none;
   padding: 0;
+  margin: 0;
+  min-width: 0;
 }
 
 .reader-control-group legend {
-  margin: 0 0.75rem 0 0;
+  display: block;
+  width: 100%;
+  margin: 0 0 0.4rem 0;
+  padding: 0;
   font-weight: 600;
-  flex-basis: 8rem;
+}
+
+.reader-control-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 .reader-control-group button {

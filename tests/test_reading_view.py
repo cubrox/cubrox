@@ -143,7 +143,7 @@ def test_user_with_no_preference_row_gets_defaults_rendered(
     assert f"--reader-size: {DEFAULT_PREFERENCES['size']}" in body
     # Default line-height is "1.6".
     assert f"--reader-line-height: {DEFAULT_PREFERENCES['line_height']}" in body
-    # Default max-width is "65ch".
+    # Default max-width is "33em" (em, not ch — consistent across machines).
     assert f"--reader-max-width: {DEFAULT_PREFERENCES['max_width']}" in body
 
 
@@ -160,7 +160,7 @@ def test_user_with_preference_row_gets_their_values_rendered(
     session.add(
         Preference(
             owner_id=user.id,
-            values={"size": "24px", "max_width": "55ch"},
+            values={"size": "24px", "max_width": "28em"},
             updated_at=datetime.now(UTC),
         )
     )
@@ -171,7 +171,7 @@ def test_user_with_preference_row_gets_their_values_rendered(
 
     # Stored values take precedence.
     assert "--reader-size: 24px" in body
-    assert "--reader-max-width: 55ch" in body
+    assert "--reader-max-width: 28em" in body
     # Unset keys still come from defaults.
     assert f"--reader-line-height: {DEFAULT_PREFERENCES['line_height']}" in body
 

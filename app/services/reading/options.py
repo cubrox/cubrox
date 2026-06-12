@@ -27,7 +27,15 @@ PREFERENCE_OPTIONS: dict[str, list[Any]] = {
     "line_height": ["1.4", "1.5", "1.6", "1.8", "2.0"],
     "bg": ["#ffffff", "#f5e6d3", "#1a1a1a"],  # white, sepia, dark
     "fg": ["#1a1a1a", "#3d2914", "#e8e8e8"],  # near-black, brown, light
-    "max_width": ["55ch", "65ch", "75ch", "85ch"],
+    # In `em` (relative to --reader-size), NOT `ch`. `ch` is the width of the
+    # font's `0` glyph, so a `ch` measure renders a DIFFERENT pixel width on
+    # machines that fall back to a different font — the stacks above are system
+    # fonts, not bundled webfonts, so the rendered font (and thus `ch`) varied
+    # by computer. `em` depends only on --reader-size (a fixed px), so the
+    # column is consistent across computers AND still scales with the size
+    # preference. ~0.5em/char keeps these close to the old 55/65/75/85-char
+    # measures.
+    "max_width": ["28em", "33em", "38em", "43em"],
     "bionic_enabled": [True, False],
 }
 
@@ -53,10 +61,10 @@ PREFERENCE_LABELS: dict[tuple[str, Any], str] = {
     ("fg", "#e8e8e8"): "Light text",
     ("bionic_enabled", True): "On",
     ("bionic_enabled", False): "Off",
-    ("max_width", "55ch"): "Narrow",
-    ("max_width", "65ch"): "Standard",
-    ("max_width", "75ch"): "Wide",
-    ("max_width", "85ch"): "Extra wide",
+    ("max_width", "28em"): "Narrow",
+    ("max_width", "33em"): "Standard",
+    ("max_width", "38em"): "Wide",
+    ("max_width", "43em"): "Extra wide",
 }
 
 

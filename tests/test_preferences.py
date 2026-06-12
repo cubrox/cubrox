@@ -103,7 +103,7 @@ def test_third_toggle_updates_only_its_own_key(client: TestClient, session: Sess
     user = signed_in(session)
 
     client.post("/preferences/size", data={"value": "20px"})
-    client.post("/preferences/max_width", data={"value": "75ch"})
+    client.post("/preferences/max_width", data={"value": "38em"})
     # Now change size again — max_width should survive.
     client.post("/preferences/size", data={"value": "28px"})
 
@@ -111,7 +111,7 @@ def test_third_toggle_updates_only_its_own_key(client: TestClient, session: Sess
     pref = session.get(Preference, user.id)
     assert pref is not None
     assert pref.values["size"] == "28px"
-    assert pref.values["max_width"] == "75ch"
+    assert pref.values["max_width"] == "38em"
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ def test_sidebar_renders_button_for_each_allow_listed_value(
 
     # Specific values from the allow-list show up.
     assert "14px" in body and "28px" in body  # size extremes
-    assert "55ch" in body and "85ch" in body  # max_width extremes
+    assert "28em" in body and "43em" in body  # max_width extremes
 
 
 def test_sidebar_buttons_target_the_style_block(client: TestClient, session: Session) -> None:

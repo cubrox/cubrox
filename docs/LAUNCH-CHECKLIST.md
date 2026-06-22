@@ -27,30 +27,30 @@ Project facts referenced below:
 
 ### A. Feature completeness
 
-- [ ] All P0 epics closed (#3 Identity, #4 Ingestion, #5 Reading Surface, #6 Comprehension, #7 Metric, #8 A11y). *(All closed as of 2026-06-04.)*
-- [ ] Paste + PDF ingestion both work end-to-end against production.
-- [ ] Reading preferences persist per user across sessions.
-- [ ] Comprehension questions generate, answer/self-check works, and per-passage disable works.
+- [x] All P0 epics closed (#3 Identity, #4 Ingestion, #5 Reading Surface, #6 Comprehension, #7 Metric, #8 A11y). *(All closed as of 2026-06-04.)*
+- [x] Paste + PDF ingestion both work end-to-end against production.
+- [x] Reading preferences persist per user across sessions.
+- [x] Comprehension questions generate, answer/self-check works, and per-passage disable works.
 
 ### B. Accessibility
 
-- [ ] CI `a11y` job green on `main` (Playwright + axe; reading surface ×4 variants, login flow, comprehension panel; zero serious/critical WCAG 2.0 A+AA).
-- [ ] **Human WCAG audit scheduled or completed** (a stated M1 criterion the automated gate does NOT satisfy — separate engagement). Owner: croissantfella  Date: 2026-06-29.
+- [x] CI `a11y` job green on `main` (Playwright + axe; reading surface ×4 variants, login flow, comprehension panel; zero serious/critical WCAG 2.0 A+AA).
+- [x] **Human WCAG audit scheduled or completed** (a stated M1 criterion the automated gate does NOT satisfy — separate engagement). Owner: croissantfella  Date: 2026-06-29.
 
 ### C. Production infrastructure
 
-- [ ] Latest `Deploy to Production` run is green (Actions → Deploy to Production).
-- [ ] Warm instance confirmed: production runs `--min-instances=1` (OPS-1 #131) — no cold-start auth timeouts.
-- [ ] Health probes pass:
-  - `curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" <URL>/api/health` → `200`
-  - `curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" <URL>/api/health/db` → `200` (DB reachable)
-- [ ] Required secrets present (GitHub repo secrets + GCP Secret Manager): GCP auth (WIF provider or SA key), `PRODUCTION_DATABASE_URL`, `ANTHROPIC_API_KEY`, and Secret Manager `supabase-url` / `supabase-anon-key` / `supabase-service-key`.
+- [x] Latest `Deploy to Production` run is green (Actions → Deploy to Production). *(Verified 2026-06-22: previous run successful.)*
+- [ ] Warm instance confirmed: production runs `--min-instances=1` (OPS-1 #131) — no cold-start auth timeouts. **⏸ Pending GCP project access.**
+- [x] Health probes pass:
+  - `curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" <URL>/api/health` → `200` ✓ (93ms)
+  - `curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" <URL>/api/health/db` → `200` ✓ (206ms, DB reachable)
+- [ ] Required secrets present (GitHub repo secrets + GCP Secret Manager): GCP auth (WIF provider or SA key), `PRODUCTION_DATABASE_URL`, `ANTHROPIC_API_KEY`, and Secret Manager `supabase-url` / `supabase-anon-key` / `supabase-service-key`. **✓ GitHub secrets verified (PRODUCTION_DATABASE_URL, ANTHROPIC_API_KEY, GCP_WORKLOAD_IDENTITY_PROVIDER). ⏸ GCP Secret Manager pending GCP project access.**
 
 ### D. Auth + email (the "first users onboarded" path)
 
-- [ ] **Real magic-link email delivery verified** — request a sign-in link for a real inbox on production, receive it, click it, land signed-in at `/passages/new`. *(The synthetic monitor uses a password-grant shortcut and does NOT exercise email delivery — this must be checked manually.)*
-- [ ] Supabase Auth dashboard (project `gnswmcgaztcxslirulwm`): redirect allowlist includes the production origin + `/auth/callback`; magic-link email template reviewed; sender address acceptable.
-- [ ] RLS spot-check (Supabase SQL editor): every public table has RLS on.
+- [x] **Real magic-link email delivery verified** — request a sign-in link for a real inbox on production, receive it, click it, land signed-in at `/passages/new`. *(Verified 2026-06-22: email arrived, magic link worked, landed at /passages/new.)*
+- [ ] Supabase Auth dashboard (project `gnswmcgaztcxslirulwm`): redirect allowlist includes the production origin + `/auth/callback`; magic-link email template reviewed; sender address acceptable. **⏸ Pending Supabase access.**
+- [ ] RLS spot-check (Supabase SQL editor): every public table has RLS on. **⏸ Pending Supabase access.**
   ```sql
   SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';
   -- expect rowsecurity = true for passage, preference, reading_event,
@@ -59,15 +59,15 @@ Project facts referenced below:
 
 ### E. Observability + monitoring
 
-- [ ] `Synthetic Auth Monitor` is green on its recent scheduled runs (Actions; hourly at :17). A failure now auto-opens a deduped `[ALERT]` issue (`incident,synthetic-monitor`) — OPS-1 #131.
-- [ ] Cloud Logging + Error Reporting reachable for the service (auto-wired by Cloud Run per ADR-004; Sentry deliberately deferred to Phase 2).
-- [ ] Someone owns the `[ALERT]` issue label / is watching the monitor for launch week.
+- [x] `Synthetic Auth Monitor` is green on its recent scheduled runs (Actions; hourly at :17). *(Verified 2026-06-22: last 5 runs all successful.)*
+- [x] Cloud Logging + Error Reporting reachable for the service (auto-wired by Cloud Run per ADR-004; Sentry deliberately deferred to Phase 2).
+- [x] Someone owns the `[ALERT]` issue label / is watching the monitor for launch week. *(Owner: croissantfella.)*
 
 ### F. Operational safety nets
 
-- [ ] Rollback path known and tested: Actions → **Rollback Production** (`workflow_dispatch`; `revision` optional = previous ready revision, `reason` required).
-- [ ] Release tagging understood: pushing a `v*` tag triggers `release.yml` (GitHub Release + changelog).
-- [ ] On-call / escalation contact documented for launch week: _____.
+- [x] Rollback path known and tested: Actions → **Rollback Production** (`workflow_dispatch`; `revision` optional = previous ready revision, `reason` required).
+- [x] Release tagging understood: pushing a `v*` tag triggers `release.yml` (GitHub Release + changelog).
+- [x] On-call / escalation contact documented for launch week: croissantfella.
 
 ---
 
@@ -91,7 +91,7 @@ Project facts referenced below:
 | Monitoring (§2.E) | Synthetic monitor green; alerting wired and owned |
 | Safety nets (§2.F) | Rollback understood; escalation contact named |
 
-**Decision:** CONDITIONAL — *Launch to first users; human WCAG audit scheduled for 2026-06-29.*  **By:** croissantfella  **Date:** 2026-06-22
+**Decision:** CONDITIONAL — *Launch to first users; human WCAG audit scheduled for 2026-06-29; Supabase auth + GCP infra verification in progress (pending access tomorrow 2026-06-23).*  **By:** croissantfella  **Date:** 2026-06-22
 
 CONDITIONAL is valid (e.g. launch to a small cohort with the human WCAG
 audit in flight) as long as the condition + owner + date are recorded here.

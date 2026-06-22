@@ -35,7 +35,7 @@ Project facts referenced below:
 ### B. Accessibility
 
 - [ ] CI `a11y` job green on `main` (Playwright + axe; reading surface ×4 variants, login flow, comprehension panel; zero serious/critical WCAG 2.0 A+AA).
-- [ ] **Human WCAG audit scheduled or completed** (a stated M1 criterion the automated gate does NOT satisfy — separate engagement). Owner: _____  Date: _____.
+- [ ] **Human WCAG audit scheduled or completed** (a stated M1 criterion the automated gate does NOT satisfy — separate engagement). Owner: croissantfella  Date: 2026-06-29.
 
 ### C. Production infrastructure
 
@@ -91,7 +91,7 @@ Project facts referenced below:
 | Monitoring (§2.E) | Synthetic monitor green; alerting wired and owned |
 | Safety nets (§2.F) | Rollback understood; escalation contact named |
 
-**Decision:** GO / NO-GO / CONDITIONAL — _____  **By:** _____  **Date:** _____
+**Decision:** CONDITIONAL — *Launch to first users; human WCAG audit scheduled for 2026-06-29.*  **By:** croissantfella  **Date:** 2026-06-22
 
 CONDITIONAL is valid (e.g. launch to a small cohort with the human WCAG
 audit in flight) as long as the condition + owner + date are recorded here.

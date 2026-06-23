@@ -46,6 +46,7 @@ from app.services.reading.options import (
     value_for_form,
 )
 from app.services.reading.preferences import upsert_preference
+from app.services.reading.sections import split_into_sections
 from app.templates import templates
 
 if TYPE_CHECKING:
@@ -113,6 +114,7 @@ def read_passage(
             "passage": passage,
             "prefs": prefs,
             "nav": nav,
+            "sections": split_into_sections(passage.text),
             "preference_options": PREFERENCE_OPTIONS,
             "label_for": label_for,
             "label_for_key": label_for_key,
@@ -174,10 +176,12 @@ def update_preference(
             select(Passage).where(Passage.id == passage_id, Passage.owner_id == user.id)  # type: ignore[arg-type]
         ).first()
 
+    sections = split_into_sections(passage.text) if passage is not None else None
+
     return templates.TemplateResponse(
         request=request,
         name="fragments/preference_update.html",
-        context={"prefs": prefs, "passage": passage},
+        context={"prefs": prefs, "passage": passage, "sections": sections},
     )
 
 

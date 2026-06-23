@@ -1,27 +1,19 @@
-<section aria-label="Comprehension check" id="questions-panel">
-  {% if questions %}
-    <h2>Check your understanding</h2>
-    <p>Answer each in your own words, then reveal the answer to check yourself.</p>
-    <ol>
-      {% for q in questions %}
-        <li>
-          {# The question doubles as the textarea's accessible name. #}
-          <label for="answer-{{ loop.index }}">{{ q.text }}</label>
-          <textarea id="answer-{{ loop.index }}" name="answer-{{ loop.index }}"
-                    rows="2" placeholder="Write your answer (optional)"></textarea>
-          {# Native <details> reveal — accessible, no JS, no server round-trip.
-             The model answer is source-grounded; the reader self-assesses. #}
-          <details>
-            <summary>Reveal answer</summary>
-            <p>{{ q.answer }}</p>
-          </details>
-        </li>
-      {% endfor %}
-    </ol>
-  {% elif error == "unavailable" %}
-    <p>Comprehension questions are temporarily unavailable.
-       The rest of your reading still works as normal.</p>
-  {% elif error == "disabled" %}
-    <p>Comprehension questions are off for this passage.</p>
-  {% endif %}
-</section>
+{% if questions %}
+  {% for q in questions %}
+  <div id="question-slot-{{ loop.index0 }}" hx-swap-oob="true" class="inline-question">
+    <label for="answer-{{ loop.index }}">{{ q.text }}</label>
+    <textarea id="answer-{{ loop.index }}" name="answer-{{ loop.index }}"
+              rows="2" placeholder="Write your answer (optional)"></textarea>
+    <details>
+      <summary>Reveal answer</summary>
+      <p>{{ q.answer }}</p>
+    </details>
+  </div>
+  {% endfor %}
+{% elif error == "unavailable" %}
+  {% for i in range(3) %}
+  <div id="question-slot-{{ i }}" hx-swap-oob="true" class="inline-question inline-question--error">
+    <p>Comprehension questions are temporarily unavailable.</p>
+  </div>
+  {% endfor %}
+{% endif %}

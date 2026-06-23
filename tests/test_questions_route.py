@@ -87,9 +87,10 @@ def test_owner_gets_questions_fragment(
 
     assert response.status_code == 200
     body = response.text
-    assert '<section aria-label="Comprehension check"' in body
-    assert "<ol>" in body
-    assert body.count("<li>") == 3
+    # Questions are returned as OOB swap divs targeting the question slots
+    # in the reading surface — one div per question.
+    assert 'id="question-slot-0"' in body
+    assert 'hx-swap-oob="true"' in body
     assert "What is the first word?" in body
 
 
@@ -261,7 +262,6 @@ def test_generator_error_returns_200_with_unavailable_fragment(
     assert response.status_code == 200
     body = response.text
     assert "temporarily unavailable" in body.lower()
-    assert '<section aria-label="Comprehension check"' in body
     assert any("comprehension generator failed" in m for m in captured)
 
 
@@ -317,27 +317,30 @@ def test_unauthenticated_htmx_request_gets_hx_redirect(client: TestClient) -> No
 
 
 def test_reading_view_contains_questions_placeholder(client: TestClient, session: Session) -> None:
-    """READ-1's reading page now includes a <div id="questions-panel">
-    that lazy-loads from this route. Pin the wiring so a future template
-    refactor that removes it can't slip through."""
+    """The reading page includes an invisible trigger div that lazy-loads
+    questions via HTMX into the question-slot-N divs in the reading surface.
+    hx-swap="none" because the response is entirely OOB swaps."""
     user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")
     body = response.text
 
-    assert 'id="questions-panel"' in body
+    assert 'id="questions-trigger"' in body
     assert f'hx-get="/passages/{passage.id}/questions"' in body
     assert 'hx-trigger="load delay:200ms"' in body
-    assert 'hx-swap="outerHTML"' in body
+    assert 'hx-swap="none"' in body
 
 
-def test_reading_view_placeholder_has_aria_live(client: TestClient, session: Session) -> None:
-    """The placeholder div needs aria-live so screen readers announce
-    the lazy-loaded content when it arrives."""
+def test_reading_view_has_question_slots_in_reading_surface(
+    client: TestClient, session: Session
+) -> None:
+    """The reading surface renders question-slot divs for each section so
+    the OOB question responses have targets to swap into."""
     user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     response = client.get(f"/read/{passage.id}")
     body = response.text
-    assert 'aria-live="polite"' in body
+
+    assert 'id="question-slot-0"' in body

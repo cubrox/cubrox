@@ -1,4 +1,4 @@
-<div id="comprehension">
+<div id="comprehension"{% if oob %} hx-swap-oob="true"{% endif %}>
   {% if passage.comprehension_enabled %}
     <button type="button"
             class="comprehension-toggle"
@@ -6,13 +6,14 @@
             hx-vals='{"enabled": "false"}'
             hx-target="#comprehension"
             hx-swap="outerHTML">Hide questions for this passage</button>
-    {# Lazy-loaded panel — fires ~200ms after this fragment renders,
-       whether on first page load or after re-enabling via the toggle. #}
-    <div id="questions-panel"
+    {# Lazy-loaded questions — fires ~200ms after this fragment renders,
+       whether on first page load or after re-enabling via the toggle.
+       hx-swap="none" because the response is entirely OOB swaps targeting
+       the question-slot-N divs inside #reading-surface. #}
+    <div id="questions-trigger"
          hx-get="/passages/{{ passage.id }}/questions"
          hx-trigger="load delay:200ms"
-         hx-swap="outerHTML"
-         aria-live="polite"></div>
+         hx-swap="none"></div>
   {% else %}
     <button type="button"
             class="comprehension-toggle"

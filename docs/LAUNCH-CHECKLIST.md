@@ -40,17 +40,17 @@ Project facts referenced below:
 ### C. Production infrastructure
 
 - [x] Latest `Deploy to Production` run is green (Actions → Deploy to Production). *(Verified 2026-06-22: previous run successful.)*
-- [ ] Warm instance confirmed: production runs `--min-instances=1` (OPS-1 #131) — no cold-start auth timeouts. **⏸ Pending GCP project access.**
+- [x] Warm instance confirmed: production runs `--min-instances=1` (OPS-1 #131) — no cold-start auth timeouts. *(Verified 2026-06-23.)*
 - [x] Health probes pass:
   - `curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" <URL>/api/health` → `200` ✓ (93ms)
   - `curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" <URL>/api/health/db` → `200` ✓ (206ms, DB reachable)
-- [ ] Required secrets present (GitHub repo secrets + GCP Secret Manager): GCP auth (WIF provider or SA key), `PRODUCTION_DATABASE_URL`, `ANTHROPIC_API_KEY`, and Secret Manager `supabase-url` / `supabase-anon-key` / `supabase-service-key`. **✓ GitHub secrets verified (PRODUCTION_DATABASE_URL, ANTHROPIC_API_KEY, GCP_WORKLOAD_IDENTITY_PROVIDER). ⏸ GCP Secret Manager pending GCP project access.**
+- [x] Required secrets present (GitHub repo secrets + GCP Secret Manager): GCP auth (WIF provider or SA key), `PRODUCTION_DATABASE_URL`, `ANTHROPIC_API_KEY`, and Secret Manager `supabase-url` / `supabase-anon-key` / `supabase-service-key`. *(All verified 2026-06-23.)*
 
 ### D. Auth + email (the "first users onboarded" path)
 
 - [x] **Real magic-link email delivery verified** — request a sign-in link for a real inbox on production, receive it, click it, land signed-in at `/passages/new`. *(Verified 2026-06-22: email arrived, magic link worked, landed at /passages/new.)*
-- [ ] Supabase Auth dashboard (project `gnswmcgaztcxslirulwm`): redirect allowlist includes the production origin + `/auth/callback`; magic-link email template reviewed; sender address acceptable. **⏸ Pending Supabase access.**
-- [ ] RLS spot-check (Supabase SQL editor): every public table has RLS on. **⏸ Pending Supabase access.**
+- [x] Supabase Auth dashboard (project `gnswmcgaztcxslirulwm`): redirect allowlist includes the production origin + `/auth/callback`; magic-link email template reviewed; sender address acceptable. *(Verified 2026-06-23.)*
+- [x] RLS spot-check (Supabase SQL editor): every public table has RLS on. *(Verified 2026-06-23.)*
   ```sql
   SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';
   -- expect rowsecurity = true for passage, preference, reading_event,
@@ -91,7 +91,7 @@ Project facts referenced below:
 | Monitoring (§2.E) | Synthetic monitor green; alerting wired and owned |
 | Safety nets (§2.F) | Rollback understood; escalation contact named |
 
-**Decision:** CONDITIONAL — *Launch to first users; human WCAG audit scheduled for 2026-06-29; Supabase auth + GCP infra verification in progress (pending access tomorrow 2026-06-23).*  **By:** croissantfella  **Date:** 2026-06-22
+**Decision:** CONDITIONAL — *All pre-launch gates verified. Human WCAG audit in flight, due 2026-06-29.*  **By:** croissantfella  **Date:** 2026-06-22
 
 CONDITIONAL is valid (e.g. launch to a small cohort with the human WCAG
 audit in flight) as long as the condition + owner + date are recorded here.

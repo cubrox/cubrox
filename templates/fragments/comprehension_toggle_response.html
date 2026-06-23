@@ -1,0 +1,18 @@
+{# Response to POST /passages/{id}/comprehension toggle.
+   Returns the updated comprehension fragment + OOB swaps for question slots
+   so they clear/load immediately without a page reload. #}
+{% with oob = true %}{% include "fragments/comprehension.html" %}{% endwith %}
+
+{% if passage.comprehension_enabled %}
+  {# Re-enabling: show loading state so the fresh trigger can load questions. #}
+  {% for i in range(3) %}
+  <div id="question-slot-{{ i }}" hx-swap-oob="true" class="question-slot-loading">
+    <p class="question-slot-placeholder">Loading question…</p>
+  </div>
+  {% endfor %}
+{% else %}
+  {# Disabling: clear all slots. #}
+  {% for i in range(3) %}
+  <div id="question-slot-{{ i }}" hx-swap-oob="true"></div>
+  {% endfor %}
+{% endif %}

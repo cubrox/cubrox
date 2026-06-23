@@ -265,10 +265,10 @@ def toggle_comprehension(
 ) -> HTMLResponse:
     """Enable/disable comprehension questions for one passage (COMP-5 #128).
 
-    Flips `passage.comprehension_enabled` and returns the `#comprehension`
-    fragment reflecting the new state; HTMX swaps it via `outerHTML`.
-    Ownership-checked exactly like GET /read — cross-user / nonexistent
-    passages 404 with an identical body.
+    Returns the updated comprehension fragment + OOB swaps for the question
+    slots (clear if disabling, loading state if enabling). This keeps the
+    slots in sync with the comprehension toggle immediately, without a
+    page reload.
     """
     passage = session.exec(
         select(Passage).where(Passage.id == passage_id, Passage.owner_id == user.id)  # type: ignore[arg-type]
@@ -283,7 +283,7 @@ def toggle_comprehension(
 
     return templates.TemplateResponse(
         request=request,
-        name="fragments/comprehension.html",
+        name="fragments/comprehension_toggle_response.html",
         context={"passage": passage},
     )
 

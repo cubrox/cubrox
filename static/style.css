@@ -15,11 +15,30 @@
   max-width: var(--reader-max-width);
   margin: 2rem auto;
   padding: 2rem;
-  /* Preserve the user's pasted whitespace structure (line breaks,
-     paragraph breaks). Without this, all text flows as one block. */
+}
+
+/* Each section of the split passage preserves whitespace exactly as the
+   user pasted/uploaded it. Moved from #reading-surface so question slots
+   between sections aren't affected by pre-wrap. */
+.reading-section {
   white-space: pre-wrap;
-  /* Long words and URLs shouldn't blow out the max-width. */
   overflow-wrap: break-word;
+}
+
+/* Inline comprehension question shown after each passage section. */
+.inline-question {
+  border-left: 3px solid var(--pico-primary);
+  padding: 0.75rem 1rem;
+  margin: 1.5rem 0;
+  background: var(--pico-card-background-color);
+  white-space: normal;
+}
+
+.question-slot-placeholder {
+  color: var(--reader-fg);
+  font-style: italic;
+  font-size: 0.9rem;
+  margin: 0;
 }
 
 /* Back link on the reading view — returns to /passages/new (the passage

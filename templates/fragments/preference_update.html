@@ -5,8 +5,12 @@
   #reading-surface-style). When a passage is supplied — i.e. the toggle
   changed `bionic_enabled`, which alters server-rendered <b> markup in
   the passage text rather than a CSS variable — it ALSO returns the
-  re-rendered article as an out-of-band swap so the surface updates
-  without a full page reload.
+  re-rendered article and comprehension trigger as out-of-band swaps.
+  The comprehension OOB swap re-fires the questions lazy-load so the
+  question slots refill after the article swap resets them.
 #}
 {% include "fragments/reader_style.html" %}
-{% if passage is not none %}{% with oob = true %}{% include "fragments/reading_surface.html" %}{% endwith %}{% endif %}
+{% if passage is not none %}
+  {% with oob = true %}{% include "fragments/reading_surface.html" %}{% endwith %}
+  {% with oob = true %}{% include "fragments/comprehension.html" %}{% endwith %}
+{% endif %}

@@ -129,7 +129,9 @@ def test_questions_route_skips_generator_when_disabled(
     response = client.get(f"/passages/{passage.id}/questions")
 
     assert response.status_code == 200
-    assert "Comprehension questions are off for this passage." in response.text
+    # When disabled, the endpoint returns an empty body — the reading surface
+    # handles the visual state via empty question-slot divs (no trigger fires).
+    assert response.text.strip() == ""
 
 
 def test_reading_view_shows_toggle_enabled_by_default(client: TestClient, session: Session) -> None:

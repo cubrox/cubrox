@@ -1,1 +1,14 @@
-<article id="reading-surface"{% if oob %} hx-swap-oob="true"{% endif %}>{% if prefs.bionic_enabled %}{{ passage.text | bionic }}{% else %}{{ passage.text }}{% endif %}</article>
+<article id="reading-surface"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {% for section in sections %}
+    {% if section %}
+      <div class="reading-section">{% if prefs.bionic_enabled %}{{ section | bionic }}{% else %}{{ section }}{% endif %}</div>
+    {% endif %}
+    {% if passage.comprehension_enabled %}
+      <div id="question-slot-{{ loop.index0 }}" class="question-slot-loading">
+        <p class="question-slot-placeholder">Loading question…</p>
+      </div>
+    {% else %}
+      <div id="question-slot-{{ loop.index0 }}"></div>
+    {% endif %}
+  {% endfor %}
+</article>

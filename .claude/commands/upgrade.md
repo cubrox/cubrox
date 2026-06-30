@@ -7,6 +7,12 @@ description: "Upgrade Gemba Flow framework files to the latest release"
 Check for a newer version of Gemba Flow and sync framework files from the
 latest upstream release. User content is never modified.
 
+## Flags
+
+- `--skip-audit` — skip the local-customizations audit step (#3). Useful
+  for automated re-runs in CI where operator confirmation is not
+  available.
+
 ## Instructions
 
 1. **Verify clean working tree** — run `git status --porcelain`. If there are
@@ -27,20 +33,49 @@ latest upstream release. User content is never modified.
      gh auth login
    ```
 
-3. **Run the sync script**:
+3. **Audit local customizations** — unless `--skip-audit` was passed, run:
+
+   ```bash
+   bash scripts/audit-local-customizations.sh
+   ```
+
+   The script surfaces framework-controlled files (paths under
+   `syncDirectories`) that have been modified locally since the fork was
+   bootstrapped and are NOT in `.gembaflow-overrides`. These are the
+   files at silent-clobber risk on the next sync.
+
+   - If the audit prints "No framework-controlled files have been
+     modified..." or "All ... locally-modified framework file(s) are
+     already covered", proceed to step 4.
+   - If the audit lists unprotected paths, PROMPT the operator:
+
+     ```
+     The audit surfaced N file(s) at clobber risk. Continue without
+     adding them to .gembaflow-overrides? [y/N]:
+     ```
+
+     - Operator answers `y` (or `yes`): proceed to step 4.
+     - Operator answers `N` / no / anything else: STOP. Suggest the
+       operator add the relevant paths to `.gembaflow-overrides` first,
+       commit, then re-run `/upgrade`.
+
+   The audit step never modifies `.gembaflow-overrides` itself — that's
+   an explicit operator choice, not automated.
+
+4. **Run the sync script**:
 
    ```bash
    bash scripts/template-sync.sh
    ```
 
-4. **Parse the output** and report what happened. The script will print one of:
+5. **Parse the output** and report what happened. The script will print one of:
 
    - **Already up to date** — no action needed.
    - **Update available: X -> Y** followed by file-level ADDED/UPDATED/SKIP
      lines and a PR URL.
    - **ERROR** — report the error message to the user.
 
-5. **If a PR was created**, remind the user:
+6. **If a PR was created**, remind the user:
 
    ```
    A sync PR has been created. Review the changes, then merge when ready:

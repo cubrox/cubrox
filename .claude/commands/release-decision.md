@@ -30,6 +30,7 @@ Launch the agile-product-manager agent to evaluate release readiness and make a 
 
 ### 4. Communication Readiness Assessment
 - Release notes prepared
+- **Release notes include a "Fork-maintained files you must update" section** (required on every release per `docs/SDLC.md`; reads "None required" if the release introduces no fork-side edits — the absence is made explicit, never omitted)
 - Customer communication planned
 - Internal stakeholders informed
 - Documentation updated

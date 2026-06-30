@@ -413,11 +413,11 @@ This usually means Phase 3 (agent configuration) did not complete. Run:
 
 ## Checking for Updates
 
-Agile Flow tracks its version in the `.agile-flow-version` file at your
+Agile Flow tracks its version in the `.gembaflow-version` file at your
 project root. To check which version you are running:
 
 ```bash
-jq .version .agile-flow-version
+jq .version .gembaflow-version
 ```
 
 To see if a newer version is available, visit the

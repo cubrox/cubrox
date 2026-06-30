@@ -1,6 +1,6 @@
 # Versioning Policy
 
-Agile Flow follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
+Gemba Flow follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## Version Format
 
@@ -36,4 +36,4 @@ MAJOR.MINOR.PATCH
 
 ## Current Version
 
-See the latest [GitHub Release](https://github.com/vibeacademy/agile-flow/releases) or the top entry in [CHANGELOG.md](./CHANGELOG.md).
+See the latest [GitHub Release](https://github.com/vibeacademy/gembaflow/releases) or the top entry in [CHANGELOG.md](./CHANGELOG.md).

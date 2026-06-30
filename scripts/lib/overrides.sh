@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# overrides.sh -- Shared loader for .agile-flow-overrides.
+# overrides.sh -- Shared loader for .gembaflow-overrides.
 #
 # Sourced by template-sync.sh (and downstream pull-upstream.sh) so both flows
 # agree on which framework files are intentionally fork-customised and must
@@ -7,10 +7,10 @@
 #
 # Usage:
 #   source "$(dirname "${BASH_SOURCE[0]}")/lib/overrides.sh"
-#   load_override_patterns ".agile-flow-overrides"   # populates OVERRIDE_PATTERNS
+#   load_override_patterns ".gembaflow-overrides"   # populates OVERRIDE_PATTERNS
 #   if is_override "scripts/doctor.sh"; then ... ; fi
 #
-# File format (.agile-flow-overrides):
+# File format (.gembaflow-overrides):
 #   - One path per line, relative to the repo root
 #   - Lines starting with `#` are comments
 #   - Blank lines are ignored
@@ -28,7 +28,7 @@ OVERRIDE_PATTERNS=()
 # (the common case on a fresh fork), OVERRIDE_PATTERNS is left empty and
 # is_override always returns 1. This preserves first-run behavior.
 load_override_patterns() {
-  local overrides_file="${1:-.agile-flow-overrides}"
+  local overrides_file="${1:-.gembaflow-overrides}"
   OVERRIDE_PATTERNS=()
 
   [ -f "$overrides_file" ] || return 0

@@ -141,6 +141,57 @@ The workflow activation agent will:
    - Add URLs to CLAUDE.md
    - Verify agent configs reference correct board
 
+7. **Persist bootstrap config + substitute templated placeholders**
+
+   Some shipped skill specs reference fork-specific values through four
+   placeholders documented in
+   [`docs/PLATFORM-GUIDE.md`](../../docs/PLATFORM-GUIDE.md) §
+   "Bootstrap-time templated values" — see that section for the full table.
+   The framework ships one spec; every fork bends it to its own setup.
+   After the operator has supplied (and you have validated) all four values
+   during the steps above, persist them and run the substitution pass.
+
+   - Copy `.gembaflow-config.example.json` to `.gembaflow-config.json` (the
+     example is the schema; the actual file is gitignored so a fork's
+     substituted values never propagate upstream).
+   - Fill in the four values:
+
+     ```json
+     {
+       "org": "<your-github-org>",
+       "board": { "id": "<your-project-board-number>" },
+       "bot": {
+         "worker": "<your-worker-bot-account>",
+         "reviewer": "<your-reviewer-bot-account>"
+       }
+     }
+     ```
+
+   - Run the substitution script:
+
+     ```bash
+     bash scripts/substitute-config-placeholders.sh
+     ```
+
+     This is idempotent — re-running after substitution completes is a no-op.
+     Pass `--check` to dry-run and report any remaining unsubstituted
+     placeholders without modifying files (useful as a CI smoke test for
+     forks that customize `.claude/commands/`).
+
+   - If you edit `.gembaflow-config.json` later (e.g. rotate bot accounts),
+     re-run the script to apply the new values. The placeholders are gone
+     from the substituted files after the first run, so the re-run only
+     touches files that have been re-introduced — for example after a
+     framework `/upgrade` that ships updated spec files containing fresh
+     placeholders.
+
+   - Behavior on missing config: if `.gembaflow-config.json` doesn't exist
+     when the script runs, it stops with a pointer back to this section.
+     Behavior on empty fields: same — fill all four before substituting.
+
+   See [`docs/PLATFORM-GUIDE.md`](../../docs/PLATFORM-GUIDE.md) §
+   "Bootstrap-time templated values" for the full convention.
+
 ## Example Backlog Generation
 
 > Every issue MUST follow `docs/TICKET-FORMAT.md`. The example below shows the

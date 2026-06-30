@@ -172,6 +172,50 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════
+#  0.5. Clone Freshness (vs origin)
+# ═══════════════════════════════════════════════════════════════════
+# Mirrors the early step in .claude/commands/doctor.md (#430): a stale clone
+# is a silent failure mode that can produce obsolete plans and missing-file
+# diagnostics whose root cause is "you needed to git pull an hour ago." This
+# check surfaces the gap before anything else relies on the local state.
+#
+# Read-only by construction: git fetch --quiet and git rev-list --count only;
+# no git pull, no git checkout. Never fails the doctor run — a stale clone is
+# a signal, not a fatal error.
+section "Clone Freshness"
+
+if GIT_CMD=$(resolve_cmd git); then
+    if "$GIT_CMD" rev-parse --git-dir >/dev/null 2>&1; then
+        # Try to fetch quietly; capture failure for the SKIP branch (offline / auth).
+        if "$GIT_CMD" fetch --quiet >/dev/null 2>&1; then
+            current_branch=$("$GIT_CMD" symbolic-ref --short HEAD 2>/dev/null || echo "")
+            if [ -n "$current_branch" ]; then
+                # Count commits behind origin/<branch>. If the upstream tracking ref
+                # doesn't exist (detached HEAD, branch not pushed), git rev-list returns
+                # non-zero — capture as "?" so we SKIP cleanly rather than misreport.
+                behind_count=$("$GIT_CMD" rev-list --count "HEAD..origin/$current_branch" 2>/dev/null || echo "?")
+                if [ "$behind_count" = "0" ]; then
+                    pass "Clone Freshness" "Local is current with origin/$current_branch"
+                elif [ "$behind_count" != "?" ] && [ "$behind_count" -gt 0 ] 2>/dev/null; then
+                    latest_subject=$("$GIT_CMD" log "HEAD..origin/$current_branch" --pretty=format:'%s' -1 2>/dev/null || echo "(could not read most-recent subject)")
+                    warn "Clone Freshness" "Local is $behind_count commits behind origin/$current_branch" "Most recent upstream commit: \"$latest_subject\". Run \`git pull\` before any planning, architecture, or /upgrade work."
+                else
+                    skip "Clone Freshness" "Could not count commits behind origin" "Unusual git state — no upstream tracking ref for $current_branch"
+                fi
+            else
+                skip "Clone Freshness" "Could not determine current branch" "Detached HEAD or unusual git state"
+            fi
+        else
+            skip "Clone Freshness" "Could not fetch from origin" "Offline or auth issue — if you're online, check \`gh auth status\` and network"
+        fi
+    else
+        skip "Clone Freshness" "Not in a git repository" "doctor.sh is being run outside a checkout"
+    fi
+else
+    skip "Clone Freshness" "git not installed" "Install git to enable this check"
+fi
+
+# ═══════════════════════════════════════════════════════════════════
 #  1. CLI Tools
 # ═══════════════════════════════════════════════════════════════════
 section "CLI Tools"

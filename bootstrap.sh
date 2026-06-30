@@ -907,15 +907,15 @@ phase4_workflow() {
     mark_phase_complete "phase4"
     print_success "Phase 4 complete! Workflow activated."
 
-    # Stamp installedAt in .agile-flow-version if not already set
-    if [ -f ".agile-flow-version" ]; then
+    # Stamp installedAt in .gembaflow-version if not already set
+    if [ -f ".gembaflow-version" ]; then
         local current_val
-        current_val=$(jq -r '.installedAt // "null"' .agile-flow-version 2>/dev/null)
+        current_val=$(jq -r '.installedAt // "null"' .gembaflow-version 2>/dev/null)
         if [ "$current_val" = "null" ]; then
             local timestamp
             timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            jq --arg ts "$timestamp" '.installedAt = $ts' .agile-flow-version > .agile-flow-version.tmp \
-                && mv .agile-flow-version.tmp .agile-flow-version
+            jq --arg ts "$timestamp" '.installedAt = $ts' .gembaflow-version > .gembaflow-version.tmp \
+                && mv .gembaflow-version.tmp .gembaflow-version
             print_success "Stamped install time: $timestamp"
         fi
     fi
@@ -952,8 +952,8 @@ show_completion() {
     echo "  - docs/TECHNICAL-ARCHITECTURE.md - Your architecture"
     echo ""
     local af_version="unknown"
-    if [ -f ".agile-flow-version" ]; then
-        af_version=$(jq -r '.version // "unknown"' .agile-flow-version 2>/dev/null)
+    if [ -f ".gembaflow-version" ]; then
+        af_version=$(jq -r '.version // "unknown"' .gembaflow-version 2>/dev/null)
     fi
     echo -e "Powered by ${CYAN}Agile Flow${NC} v${af_version} — https://github.com/vibeacademy/agile-flow"
     echo ""

@@ -4,6 +4,17 @@ description: "Phase 3: Specialize agents with project-specific context"
 
 Update all agent configurations with project-specific context from your PRD and Technical Architecture.
 
+## Variant: Product vs Platform
+
+`/bootstrap-agents` has two variants:
+
+- **`--variant product`** (default) — the agent roster Gemba Flow ships for customer-facing product projects: `quality-engineer`, `github-ticket-worker`, `pr-reviewer`, `system-architect`, plus `product-manager` and `product-owner`. This is the existing behavior; if you don't pass a `--variant` flag, this is what runs.
+- **`--variant platform`** — the agent roster tuned for **platform-shape** projects (frameworks, harnesses, distribution pipelines, sync mechanics, fork-impact analysis). Six agents derived from a calibrated platform-shape fork: `framework-architect`, `github-ticket-worker`, `platform-backlog-prioritizer`, `pr-reviewer`, `release-engineer`, `swarm-planner`. When you pass `--variant platform`, the six platform agents are installed into `.claude/agents/` from `.claude/commands/bootstrap-agents/platform/` (overwriting the framework portion of any existing agent files, preserving anything after `<!-- FRAMEWORK:END -->`), and Phase 3 proceeds as usual.
+
+Pick `platform` when the project's primary work is **emitting platform shapes** — release engineering, distribution classification, sync mechanics, fork-impact analysis, ruleset coordination — rather than building features for end users. The two variants are mutually exclusive; pick one per project. If you're not sure, pick `product`.
+
+The platform variant's template set is derived from `vibeacademy/gembaflow-meta`'s calibrated roster. See `gembaflow-meta` PR #99 for the original platform-shape calibration proposal.
+
 ## Bootstrap Phase 3: Agent Specialization
 
 **Prerequisites**:
@@ -63,6 +74,17 @@ These agents reference the PRD and roadmap directly, so they're already speciali
 ## Process
 
 The specialization agent will:
+
+0. **Select variant (if `--variant platform` was passed)**
+
+   When invoked with `--variant platform`:
+
+   - Read each agent template from `.claude/commands/bootstrap-agents/platform/` (6 files: `framework-architect.md`, `github-ticket-worker.md`, `platform-backlog-prioritizer.md`, `pr-reviewer.md`, `release-engineer.md`, `swarm-planner.md`).
+   - For each template, install it to `.claude/agents/<same-name>.md`. If a file already exists there, **replace the framework portion only** (everything between `<!-- FRAMEWORK:START -->` and `<!-- FRAMEWORK:END -->`, inclusive of the markers); preserve any content AFTER `<!-- FRAMEWORK:END -->` (the operator's prior specialization). If no file exists, install the template wholesale.
+   - Remove any product-variant agent files that aren't part of the platform set (e.g., `quality-engineer.md`, `system-architect.md`, `product-manager.md`, `product-owner.md`) ONLY if they have no content after `<!-- FRAMEWORK:END -->`. If they have operator specialization, leave them and emit a WARN listing which files to manually retire.
+   - Proceed to step 1 (specialization runs against the new platform roster).
+
+   When invoked without `--variant` or with `--variant product`: skip step 0 entirely and proceed to step 1.
 
 1. **Read Source Documents**
    - docs/PRODUCT-REQUIREMENTS.md
@@ -221,12 +243,18 @@ Edit the agent files directly in `.claude/agents/`.
 ## Running This Command
 
 1. Ensure Phases 1 and 2 are complete
-2. Type `/bootstrap-agents`
+2. Type `/bootstrap-agents` (defaults to `--variant product`) or `/bootstrap-agents --variant platform`
 3. Review the proposed updates
 4. Confirm to apply changes
 5. Optionally refine manually
 
 When complete, run `./bootstrap.sh` to continue to Phase 4.
+
+### Variant decision
+
+If your project's primary work is building features for end users, run `/bootstrap-agents` (product variant — default).
+
+If your project's primary work is emitting platform shapes (releases, sync mechanics, fork-impact analysis, ruleset coordination — e.g. a meta repo, a development harness, a distribution pipeline), run `/bootstrap-agents --variant platform`. See `docs/SDLC.md` for when each variant is appropriate.
 
 ## Rollback
 

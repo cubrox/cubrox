@@ -23,6 +23,43 @@ the user if any check fails — do not continue with partial tooling.
 4. **Project board is accessible** — Attempt to read the project board. If
    access is denied or the board does not exist, STOP and report.
 
+## Drain Mode Pre-Flight (REQUIRED when `DRAIN_CONTEXT` is set)
+
+If `DRAIN_CONTEXT=true` is set in the environment (the signal that
+`/work-ticket` was invoked from `/drain` — the drain orchestrator),
+additionally verify:
+
+1. **Safety class is present** — Run `gh issue view <N> --json labels`
+   and confirm exactly **one** `safety:*` label is set. If zero or more
+   than one, STOP with `safety:unclassified — abort`, leave the ticket
+   in place, and signal the drain orchestrator to continue with the
+   next ticket (greedy failure semantics — a missing classification is
+   the operator's call to make, not the worker's).
+2. **Safety class is drain-eligible** — The single label must be one of
+   `safety:flagged`, `safety:internal`, or `safety:reversible`. If the
+   label is `safety:hot`, STOP with `safety:hot — refused by drain`,
+   leave the ticket in Ready, and signal continue. Hot tickets are a
+   feature, not a failure; they wait for the operator.
+
+Standalone `/work-ticket` (when `DRAIN_CONTEXT` is unset, e.g. a human
+runs the skill directly) does NOT require a safety label — this preserves
+backward compatibility for human-driven work. The two drain-mode checks
+above are gated on the env var exactly so this guarantee holds.
+
+See [`docs/safety-classes.md`](../../docs/safety-classes.md) for the
+taxonomy decision tree and worked examples.
+
+**Pre-substitution placeholder check.** If you see any of the four
+bootstrap-time templated values (documented in
+[`docs/PLATFORM-GUIDE.md`](../../docs/PLATFORM-GUIDE.md) §
+"Bootstrap-time templated values") still in their raw `{{ ... }}` form
+anywhere in this file or other `.claude/commands/*.md` files when you
+read them, STOP with a message pointing the operator at
+`bootstrap-workflow.md` — the substitution step hasn't run yet. Re-run
+`bash scripts/substitute-config-placeholders.sh` (or re-bootstrap)
+before proceeding. This avoids the failure mode where unsubstituted
+template strings leak into runtime instructions.
+
 ## Critical Rules
 
 1. **Branch from main**: `feature/issue-{number}-short-description`
@@ -30,8 +67,9 @@ the user if any check fails — do not continue with partial tooling.
 3. **All tests must pass before pushing** — never use `--no-verify`
 4. **Monitor CI after PR creation**: `gh pr checks <PR_NUMBER> --watch` — fix failures up to 3 times
 5. **Move ticket to In Review** only when CI passes
-6. **Never merge PRs** — human reviewer does this
-7. **Never commit directly to main** — always use feature branches and PRs
+6. **Auto-handoff to `pr-reviewer` on green CI** — once CI is green and the ticket is in In Review, launch the `pr-reviewer` agent via the Task tool immediately. Do not pause for human approval; green CI means the human is out of the loop until the GO/NO-GO is posted. (Solo mode only — swarm mode skips this; the orchestrator handles review timing.)
+7. **Never merge PRs** — human reviewer does this
+8. **Never commit directly to main** — always use feature branches and PRs
 
 ## Workflow Steps
 
@@ -64,7 +102,8 @@ the user if any check fails — do not continue with partial tooling.
 6. **Test Locally** — Run lint and tests. Do NOT push if any fail.
 7. **Push** — If pre-push hook fails, fix and retry (see Reference below)
 8. **Create PR** — Detailed description, link to issue
-9. **Monitor CI** — Watch checks, auto-fix failures, move to In Review when green
+9. **Monitor CI** — Watch checks, auto-fix failures (max 3 attempts), move to In Review when green
+10. **Hand off to reviewer** — On green CI, launch the `pr-reviewer` agent via the Task tool with the PR number. Wait for the GO/NO-GO verdict to be posted before returning. If CI never reaches green within 3 fix attempts, do NOT hand off — leave the escalation comment per the protocol below and stop.
 
 ## Quick Fix Protocol
 
@@ -167,13 +206,32 @@ Report each step with a Progress Line, then end your output with a Result Block:
 → Tests passing (3/3)
 → Pushed to origin
 → Created PR #108
+→ CI green (1 fix attempt: ruff)
 → Moved #21 to In Review
+→ Handed off to pr-reviewer (GO posted)
 
 ---
 
-**Result:** PR created
+**Result:** PR created and reviewed
 PR: #108 — feat: add health check endpoint
 Branch: feature/issue-21-health-check
 Ticket: #21 — moved to In Review
-Status: CI pending
+CI: green
+Review: GO posted by pr-reviewer
+```
+
+If CI does not reach green within 3 fix attempts, the handoff is skipped and the Result Block reflects the escalation instead:
+
+```
+→ Created PR #108
+→ CI failed (3 fix attempts exhausted)
+→ Posted escalation comment on PR
+→ Ticket #21 left in In Progress
+
+---
+
+**Result:** PR created — escalated, no handoff
+PR: #108 — feat: add health check endpoint
+CI: red after 3 attempts (test failure: <summary>)
+Review: not started — awaiting human
 ```

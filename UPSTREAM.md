@@ -1,7 +1,7 @@
 # Upstream Sync Notes
 
 This repository is a GCP + FastAPI fork of
-[vibeacademy/agile-flow](https://github.com/vibeacademy/agile-flow).
+[vibeacademy/gembaflow](https://github.com/vibeacademy/gembaflow).
 
 ## Source Commit
 
@@ -94,7 +94,7 @@ platform-specific content differs.
 ### Project metadata
 
 - `CLAUDE.md` — tech stack, database, platform, build commands
-- `README.md` — repositioned as "Agile Flow (GCP + FastAPI Edition)",
+- `README.md` — repositioned as "Gemba Flow (GCP + FastAPI Edition)",
   pointer to upstream for non-GCP or non-Python users
 
 ### New files
@@ -150,11 +150,11 @@ upstream when the framework updates:
 
 ## Sync Procedure
 
-When upstream Agile Flow releases a new version:
+When upstream Gemba Flow releases a new version:
 
 1. Add the upstream as a remote (one-time):
    ```bash
-   git remote add upstream https://github.com/vibeacademy/agile-flow.git
+   git remote add upstream https://github.com/vibeacademy/gembaflow.git
    ```
 
 2. Fetch and review the diff:

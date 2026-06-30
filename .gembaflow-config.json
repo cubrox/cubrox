@@ -1,0 +1,12 @@
+{
+  "$schema": "https://github.com/vibeacademy/gembaflow/raw/main/.gembaflow-config.example.json",
+  "$comment": "Solo-mode config: org/worker/reviewer all = cubrox (the GitHub user owning this fork). board.id is the cubrox-user board #2 (@masterkey). To override locally without committing, create .gembaflow-config.local.json (gitignored).",
+  "org": "cubrox",
+  "board": {
+    "id": "2"
+  },
+  "bot": {
+    "worker": "tck517",
+    "reviewer": "cubrox"
+  }
+}

@@ -70,3 +70,12 @@ roster-output.csv
 # Playwright's per-run artifacts get their own entries.
 tests/a11y/test-results/
 tests/a11y/playwright-report/
+
+# Per-operator override for .gembaflow-config.json; never committed.
+.gembaflow-config.local.json
+
+# Output of scripts/report-issue.sh — local copies of upstream bug reports.
+.gembaflow-reports/
+
+# Output of reports/refactor/03-verification.sh — timestamped baseline snapshots.
+reports/refactor/snapshots/

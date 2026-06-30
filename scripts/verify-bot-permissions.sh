@@ -40,6 +40,33 @@ ORG=$(echo "$REPO" | cut -d'/' -f1)
 WORKER_BOT="${WORKER_BOT:-${ORG}-worker}"
 REVIEWER_BOT="${REVIEWER_BOT:-${ORG}-reviewer}"
 
+# CI check name deprecation aliases
+# ---------------------------------
+# When this script's expected_checks list is renamed (e.g. v1.2.1 renamed
+# `typecheck` → `version-parity`), forks need a release cycle to rename
+# their own `.github/workflows/ci.yml` job to match. During that window,
+# the script should accept EITHER the new name OR the old name so the
+# fork's required-check verification keeps passing.
+#
+# Convention: when adding a new alias, add an entry below with the
+# DEPRECATED_AT: marker so the cleanup-bot can grep for stale entries:
+#
+#   [old-name]=new-name  # DEPRECATED_AT: vX.Y.Z; remove in vX.Y+1
+#
+# The KEY is the old (deprecated) name; the VALUE is the new (canonical)
+# name listed in expected_checks. To find all active aliases:
+#
+#   grep -n "DEPRECATED_AT:" scripts/verify-bot-permissions.sh
+#
+# After one release cycle, file a follow-up PR removing the entry. Forks
+# that haven't renamed by then will start failing the verification (which
+# is the intended behavior — the grace period has elapsed).
+declare -A DEPRECATED_CHECK_ALIASES=(
+    # No active aliases at the moment. The mechanism is in place for the
+    # next rename. Illustrative example (NOT active):
+    #   [typecheck]=version-parity  # DEPRECATED_AT: v1.2.1; remove in v1.3.0
+)
+
 # Counters
 PASS=0
 FAIL=0
@@ -257,17 +284,44 @@ test_required_status_checks() {
     if [ -n "$checks" ]; then
         # `version-parity` was previously named `typecheck` (renamed in #361
         # because the job runs JSON + version-parity validation, not `tsc`).
-        local expected_checks="lint version-parity build test"
+        # In #428 the umbrella was split: `json-validate` is now its own job,
+        # and `version-parity` runs only the .gembaflow-version vs package.json
+        # parity check. Forks with branch protection need BOTH in required-checks.
+        # For future renames, see DEPRECATED_CHECK_ALIASES at the top of
+        # this script — entries there let a deprecated old name satisfy
+        # the corresponding new-name expectation for one release cycle.
+        local expected_checks="lint json-validate version-parity build test"
         local missing=""
+        local deprecated_accepted=""
 
         for check in $expected_checks; do
-            if ! echo "$checks" | grep -q "^$check$"; then
+            if echo "$checks" | grep -q "^$check$"; then
+                continue
+            fi
+
+            # Not found under the canonical name; try any deprecation
+            # alias whose value maps to this expected check.
+            local alias_satisfied=""
+            for old_name in "${!DEPRECATED_CHECK_ALIASES[@]}"; do
+                if [ "${DEPRECATED_CHECK_ALIASES[$old_name]}" = "$check" ] && echo "$checks" | grep -q "^$old_name$"; then
+                    alias_satisfied="$old_name"
+                    break
+                fi
+            done
+
+            if [ -n "$alias_satisfied" ]; then
+                deprecated_accepted="$deprecated_accepted ${alias_satisfied}→${check}"
+            else
                 missing="$missing $check"
             fi
         done
 
         if [ -z "$missing" ]; then
-            pass "All required status checks configured (lint, version-parity, build, test)"
+            pass "All required status checks configured (lint, json-validate, version-parity, build, test)"
+            if [ -n "$deprecated_accepted" ]; then
+                echo -e "  ${YELLOW}↳ accepted via deprecation alias:${NC}$deprecated_accepted"
+                echo -e "  ${YELLOW}  rename the fork's CI job to the canonical name before the alias is removed.${NC}"
+            fi
         else
             fail "Missing required status checks:$missing"
         fi

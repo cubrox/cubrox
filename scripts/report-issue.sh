@@ -26,8 +26,9 @@ TITLE=""
 NON_INTERACTIVE=false
 BODY_FILE=""
 BODY=""
-FORCE_CODESPACES_TOKEN=false
+TRY_ANYWAY=false
 DRY_RUN=false
+FIXTURE_REPO=""
 
 show_help() {
   cat <<'HELP'
@@ -38,13 +39,18 @@ Usage:
 
 Flags:
   --severity LEVEL       Issue severity: p1 (critical), p2 (high), p3 (low)
-  --component COMP       Component: provisioning, ci, claude-commands, patterns, docs, other
+  --component COMP       Component: provisioning, ci, claude-commands, sync, patterns, docs, other
   --title "TITLE"        Issue title (required)
   --non-interactive      Run without prompts (requires all flags)
   --body-file FILE       Read issue body from file (non-interactive only)
   --body "TEXT"          Provide issue body as text (non-interactive only)
-  --dry-run              Preview what would be created without submitting
-  --force-codespaces-token  Continue despite Codespaces token limitations
+  --dry-run              Preview what would be created without submitting (zero network calls)
+  --fixture-repo SLUG    Target a test fixture repo (org/name) instead of upstream
+  --try-anyway           Skip the Codespaces preflight and try `gh CLI` normally.
+                         Use this when you know your token can reach the upstream
+                         repo (e.g. you've set GH_TOKEN to a ghp_* PAT). The
+                         preferred fix is the PAT path — `--try-anyway` is the
+                         escape hatch for ad-hoc one-offs.
   --help, -h             Show this help message
 
 Description Entry Modes:
@@ -101,11 +107,31 @@ while [[ $# -gt 0 ]]; do
     --body-file)       BODY_FILE="$2";      shift 2 ;;
     --body)            BODY="$2";           shift 2 ;;
     --dry-run)         DRY_RUN=true;        shift ;;
-    --force-codespaces-token) FORCE_CODESPACES_TOKEN=true; shift ;;
+    --fixture-repo)    FIXTURE_REPO="$2";   shift 2 ;;
+    --try-anyway)      TRY_ANYWAY=true;     shift ;;
+    # Hidden backward-compat alias for the pre-#296 name.
+    --force-codespaces-token) TRY_ANYWAY=true; shift ;;
     --help|-h)         show_help; exit 0 ;;
     *) echo "ERROR: Unknown flag: $1" >&2; exit 1 ;;
   esac
 done
+
+# ── Validate --dry-run / --fixture-repo combinations ─────────────────────────
+
+if $DRY_RUN && [ -n "$FIXTURE_REPO" ]; then
+  echo "ERROR: --dry-run and --fixture-repo are mutually exclusive." >&2
+  echo "Use --dry-run to preview without any network call, or --fixture-repo to" >&2
+  echo "actually file an issue against a test repo. Not both." >&2
+  exit 1
+fi
+
+if [ -n "$FIXTURE_REPO" ]; then
+  if [[ ! "$FIXTURE_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+    echo "ERROR: --fixture-repo must match 'org/name' (e.g. va-worker/gembaflow-test-fixture)." >&2
+    echo "Got: '$FIXTURE_REPO'" >&2
+    exit 1
+  fi
+fi
 
 # ── Verify the version manifest exists ────────────────────────────────────────
 
@@ -154,6 +180,13 @@ else
   exit 1
 fi
 
+# Override the upstream repo with the test-fixture slug if --fixture-repo is set.
+# Upstream URL/version are still read from .gembaflow-version so the report's YAML
+# front matter remains truthful about which fork issued it.
+if [ -n "$FIXTURE_REPO" ]; then
+  UPSTREAM_REPO="$FIXTURE_REPO"
+fi
+
 # ── Check for Codespaces token limitations ────────────────────────────────────
 
 check_codespaces_token() {
@@ -180,7 +213,7 @@ check_codespaces_token() {
   fi
   
   # Return status: 0 if we should use fallback, 1 if we can proceed normally
-  if $is_codespaces && $has_ghu_token && ! $FORCE_CODESPACES_TOKEN; then
+  if $is_codespaces && $has_ghu_token && ! $TRY_ANYWAY; then
     return 0  # Use fallback
   else
     return 1  # Proceed normally
@@ -339,21 +372,22 @@ if [ -z "$COMPONENT" ]; then
       more)
         echo ""
         echo "Additional components:"
+        echo "  sync            template-sync.sh, /upgrade, overrides, .gembaflow-version"
         echo "  patterns        architectural patterns and practices"
         echo "  other           anything else"
         echo "  back            return to main components"
         printf "> "
         read -r COMPONENT
-        
+
         case "$COMPONENT" in
-          patterns|other)
+          sync|patterns|other)
             break
             ;;
           back)
             continue  # Go back to main component selection
             ;;
           *)
-            echo "ERROR: Please select 'patterns', 'other', or 'back'." >&2
+            echo "ERROR: Please select 'sync', 'patterns', 'other', or 'back'." >&2
             ;;
         esac
         ;;
@@ -365,9 +399,9 @@ if [ -z "$COMPONENT" ]; then
 fi
 
 case "$COMPONENT" in
-  provisioning|ci|claude-commands|patterns|docs|other) ;;
+  provisioning|ci|claude-commands|sync|patterns|docs|other) ;;
   *)
-    echo "ERROR: --component must be one of: provisioning, ci, claude-commands, patterns, docs, other." >&2
+    echo "ERROR: --component must be one of: provisioning, ci, claude-commands, sync, patterns, docs, other." >&2
     echo "Got: '$COMPONENT'" >&2
     exit 1
     ;;
@@ -541,14 +575,11 @@ if $DRY_RUN; then
   echo ""
   echo "Repository: $UPSTREAM_REPO"
   echo "Title: [downstream-report] $TITLE"
-  
-  # Check if downstream-report label exists and show what labels would be applied
-  if check_downstream_label; then
-    echo "Labels: downstream-report"
-  else
-    echo "Labels: (none - downstream-report label not found in target repo)"
-  fi
-  
+
+  # Dry-run MUST make zero network calls. Skip the live label-existence probe
+  # (gh label list hits api.github.com); show both possible labels paths instead.
+  echo "Labels: downstream-report (applied if the label exists in the target repo; omitted otherwise)"
+
   echo ""
   echo "Body:"
   echo "────────────────────────────────────────────────────────"
@@ -591,6 +622,11 @@ if command -v gh >/dev/null 2>&1; then
       echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       echo "Issue filed successfully."
       echo "Report saved: $REPORT_FILE"
+      echo ""
+      echo "Severity ($SEVERITY) is recorded in the report's YAML front matter,"
+      echo "not as a repo label. Priority is canonical on the upstream project"
+      echo "board, not on this issue. If this issue should be tracked there,"
+      echo "add it to the board and set its Priority field."
       echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       exit 0
     fi
@@ -609,6 +645,11 @@ if command -v gh >/dev/null 2>&1; then
       echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       echo "Issue filed successfully."
       echo "Report saved: $REPORT_FILE"
+      echo ""
+      echo "Severity ($SEVERITY) is recorded in the report's YAML front matter,"
+      echo "not as a repo label. Priority is canonical on the upstream project"
+      echo "board, not on this issue. If this issue should be tracked there,"
+      echo "add it to the board and set its Priority field."
       echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       exit 0
     fi

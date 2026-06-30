@@ -1,0 +1,12 @@
+{
+  "$schema": "https://github.com/vibeacademy/gembaflow/raw/main/.gembaflow-config.example.json",
+  "$comment": "Per-fork config consumed by scripts/substitute-config-placeholders.sh. Copy this file to .gembaflow-config.json and fill in your values, then run /bootstrap-workflow or substitute-config-placeholders.sh directly. The four fields are substituted into {{org}} / {{board.id}} / {{bot.worker}} / {{bot.reviewer}} placeholders inside .claude/commands/*.md. See docs/PLATFORM-GUIDE.md for the templating convention.",
+  "org": "your-github-org",
+  "board": {
+    "id": "your-project-board-number"
+  },
+  "bot": {
+    "worker": "your-worker-bot-account",
+    "reviewer": "your-reviewer-bot-account"
+  }
+}

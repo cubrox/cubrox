@@ -29,8 +29,8 @@ Verify ALL of the following BEFORE setting the `/goal` condition. STOP and
 report to the user if any check fails — do not begin the loop with partial
 or unhealthy state.
 
-1. **`gh` CLI is authenticated as `cubrox`** — `gh auth status` shows
-   `cubrox` as the active account. If not, run `gh auth switch -u cubrox`.
+1. **`gh` CLI is authenticated as `tck517`** — `gh auth status` shows
+   `tck517` as the active account. If not, run `gh auth switch -u tck517`.
 2. **Repository accessible** — `gh repo view --json nameWithOwner` succeeds.
 3. **Project board accessible** — `gh project view 2 --owner cubrox`
    succeeds. Board operations during the drain require this scope.

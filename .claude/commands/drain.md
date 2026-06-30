@@ -29,10 +29,10 @@ Verify ALL of the following BEFORE setting the `/goal` condition. STOP and
 report to the user if any check fails — do not begin the loop with partial
 or unhealthy state.
 
-1. **`gh` CLI is authenticated as `{{bot.worker}}`** — `gh auth status` shows
-   `{{bot.worker}}` as the active account. If not, run `gh auth switch -u {{bot.worker}}`.
+1. **`gh` CLI is authenticated as `cubrox`** — `gh auth status` shows
+   `cubrox` as the active account. If not, run `gh auth switch -u cubrox`.
 2. **Repository accessible** — `gh repo view --json nameWithOwner` succeeds.
-3. **Project board accessible** — `gh project view {{board.id}} --owner {{org}}`
+3. **Project board accessible** — `gh project view 2 --owner cubrox`
    succeeds. Board operations during the drain require this scope.
 4. **`agent-merge.yml` exists on `main`** — the merge gate from `#129` must be
    discoverable on the default branch (otherwise `gh workflow run agent-merge.yml`
@@ -51,7 +51,7 @@ or unhealthy state.
 
 After pre-flight clears:
 
-1. **Snapshot the Ready column** — `gh project item-list {{board.id}} --owner {{org}} --limit 100 --format json`, filter for `status == "Ready"`.
+1. **Snapshot the Ready column** — `gh project item-list 2 --owner cubrox --limit 100 --format json`, filter for `status == "Ready"`.
 2. **Topo-sort by `Depends on:` lines** in each ticket's body. Any ticket whose
    declared dependency is not in `Done` state goes to the back of the order
    (or is skipped if the dependency is itself still in Ready and the drain

@@ -1,4 +1,4 @@
-# .agile-flow-overrides
+# .gembaflow-overrides
 #
 # Files in syncDirectories that are intentionally customised for this fork.
 # template-sync.sh will never overwrite these.
@@ -14,6 +14,9 @@
 # Commands with GCP-specific checks / instructions
 .claude/commands/doctor.md
 .claude/commands/bootstrap-architecture.md
+
+# Commands with bootstrap-time substituted placeholders (protect from sync revert)
+.claude/commands/work-ticket.md
 
 # GCP-specific scripts (these don't exist in upstream)
 scripts/provision-gcp-project.sh

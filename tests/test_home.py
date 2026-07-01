@@ -94,9 +94,9 @@ def test_landing_page_signin_form_swaps_inline(client: TestClient) -> None:
 def test_landing_page_mentions_product_name(client: TestClient) -> None:
     """Basic branding sanity check — visiting the URL should make it
     obvious you're looking at Master Key (the public product name),
-    not the starter template's todo demo. 'Cubrox' remains the
-    internal codebase identifier (repo name, package name) but is
-    no longer surfaced to users."""
+    not the starter template's todo demo. Post-rename (Epic #182),
+    the internal codebase identifier is aligned with the public
+    brand: `masterkey` (repo name after #201, package + config)."""
     body = client.get("/").text
     assert "Master Key" in body
 

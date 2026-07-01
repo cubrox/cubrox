@@ -13,7 +13,7 @@ export interface SeedResult {
  * BrowserContext so navigations are authenticated.
  *
  * The /test/seed-passage-and-login route is gated behind
- * CUBROX_TEST_SEED_ENABLED=true at app boot — see
+ * MASTERKEY_TEST_SEED_ENABLED=true at app boot — see
  * `app/api/test_seed.py`. Production Cloud Run revisions don't set
  * the var; the seed route returns 404 there because the router is
  * never registered.

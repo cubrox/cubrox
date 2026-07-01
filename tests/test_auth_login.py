@@ -70,12 +70,12 @@ def test_redirect_url_uses_x_forwarded_headers_when_present(
         data={"email": "reader@example.com"},
         headers={
             "x-forwarded-proto": "https",
-            "x-forwarded-host": "pr-42---agile-flow-app-xyz.run.app",
+            "x-forwarded-host": "pr-42---masterkey-xyz.run.app",
         },
     )
     call = supabase_mock.auth.sign_in_with_otp.call_args
     redirect = call.args[0]["options"]["email_redirect_to"]
-    assert redirect == "https://pr-42---agile-flow-app-xyz.run.app/auth/callback"
+    assert redirect == "https://pr-42---masterkey-xyz.run.app/auth/callback"
 
 
 def test_supabase_upstream_error_returns_502(client: TestClient, supabase_mock: MagicMock) -> None:

@@ -62,7 +62,7 @@ export default defineConfig({
       // Enable the test-only seed router (POST /test/seed-passage-and-login)
       // used by reading_surface.spec.ts. See app/api/test_seed.py for the
       // module-level guardrail; production Cloud Run never sets this.
-      CUBROX_TEST_SEED_ENABLED: "true",
+      MASTERKEY_TEST_SEED_ENABLED: "true",
       // Harness runs over http://localhost; secure-only cookies would
       // never be sent back to the seed-issued session.
       SESSION_COOKIE_SECURE: "false",

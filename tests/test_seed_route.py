@@ -2,7 +2,7 @@
 
 These tests exercise the actual POST /test/seed-passage-and-login
 route. The conftest doesn't normally register this router (the
-conditional in `app/main.py` only fires when `CUBROX_TEST_SEED_ENABLED=true`
+conditional in `app/main.py` only fires when `MASTERKEY_TEST_SEED_ENABLED=true`
 at app boot), so we mount the router onto the existing test app via
 FastAPI's `include_router` for the duration of each test.
 

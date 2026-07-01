@@ -797,7 +797,7 @@ fi
 #                              so first real deploy doesn't change ACL
 #   --port=8080 = matches the FastAPI Dockerfile and preview-deploy config
 
-SERVICE_NAME="${CLOUD_RUN_SERVICE:-agile-flow-app}"
+SERVICE_NAME="${CLOUD_RUN_SERVICE:-masterkey}"
 
 if gcloud run services describe "$SERVICE_NAME" \
     --region="$GCP_REGION" \
@@ -1008,7 +1008,7 @@ fi
 echo ""
 echo "   GCP_REGION             = $GCP_REGION"
 echo "   ARTIFACT_REPO          = $ARTIFACT_REPO"
-echo "   CLOUD_RUN_SERVICE      = agile-flow-app"
+echo "   CLOUD_RUN_SERVICE      = masterkey"
 echo "   NEXT_PUBLIC_APP_URL    = (your production URL)"
 echo ""
 echo "5. Push to main to trigger your first deployment."

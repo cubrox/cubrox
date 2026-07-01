@@ -1,5 +1,5 @@
 {
-  "name": "cubrox-a11y-tests",
+  "name": "masterkey-a11y-tests",
   "private": true,
   "description": "Playwright + axe-core accessibility harness. Scoped to tests/a11y/ — production stays Node-free. See tests/a11y/README.md.",
   "scripts": {

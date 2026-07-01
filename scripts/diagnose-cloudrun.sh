@@ -20,7 +20,7 @@
 #   ./scripts/diagnose-cloudrun.sh --help
 #
 # Required: GCP_PROJECT_ID env or --project=<id>
-# Optional: GCP_REGION (default: us-central1), CLOUD_RUN_SERVICE (default: agile-flow-app)
+# Optional: GCP_REGION (default: us-central1), CLOUD_RUN_SERVICE (default: masterkey)
 #
 # Surfaced from the 2026-04-29 dry-run on tck517/tck517-app, where the
 # diagnostic command that cracked the case was a hand-composed multi-
@@ -32,7 +32,7 @@ set -uo pipefail
 
 PROJECT="${GCP_PROJECT_ID:-}"
 REGION="${GCP_REGION:-us-central1}"
-SERVICE="${CLOUD_RUN_SERVICE:-agile-flow-app}"
+SERVICE="${CLOUD_RUN_SERVICE:-masterkey}"
 
 print_help() {
   sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'

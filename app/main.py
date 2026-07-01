@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import auth, health, home, passages, reading, todos
 from app.integrations.supabase.auth import UnauthenticatedError
 
-app = FastAPI(title="Agile Flow GCP")
+app = FastAPI(title="Master Key")
 
 
 @app.exception_handler(UnauthenticatedError)
@@ -56,12 +56,12 @@ app.include_router(passages.router)
 app.include_router(reading.router)
 
 # Test-only seed router (A11Y-2 #25, restored in #97). Only mounts when
-# CUBROX_TEST_SEED_ENABLED=true — the CI a11y job sets this via
+# MASTERKEY_TEST_SEED_ENABLED=true — the CI a11y job sets this via
 # playwright.config.ts > webServer.env. Production Cloud Run revisions
 # never set it, so the router is unreachable in prod. The router file
 # itself has a second module-level guard so a stray `import` would
 # also fail loudly.
-if os.environ.get("CUBROX_TEST_SEED_ENABLED") == "true":
+if os.environ.get("MASTERKEY_TEST_SEED_ENABLED") == "true":
     from app.api import test_seed
 
     app.include_router(test_seed.router)

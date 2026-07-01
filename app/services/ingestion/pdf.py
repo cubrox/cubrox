@@ -2,7 +2,7 @@
 
 Per ADR-003, this is the only library allowed for PDF parsing —
 PyMuPDF (`fitz`) is forbidden because its AGPL license would force
-the same terms onto Cubrox. pdfplumber is MIT-licensed.
+the same terms onto Masterkey. pdfplumber is MIT-licensed.
 
 Parsing happens in-process for ≤25 MB uploads (Cloud Run gives us
 32 MB of request-body headroom). The raw PDF bytes are never written

@@ -13,7 +13,7 @@ npx playwright test                 # spawns the FastAPI app, runs tests
 ```
 
 The config's `webServer` block starts `uv run uvicorn app.main:app --port 8080`
-from the repo root with `CUBROX_TEST_SEED_ENABLED=true` and a few other
+from the repo root with `MASTERKEY_TEST_SEED_ENABLED=true` and a few other
 test-only env vars, waits for `/api/health` to return 200, then runs the
 specs against `http://localhost:8080`.
 
@@ -35,9 +35,9 @@ route is implemented in [app/api/test_seed.py](../../app/api/test_seed.py)
 and gated by **two layers**:
 
 1. **Module guard** — `app/api/test_seed.py` raises `RuntimeError` on
-   import unless `CUBROX_TEST_SEED_ENABLED=true` OR `ENVIRONMENT=test`.
+   import unless `MASTERKEY_TEST_SEED_ENABLED=true` OR `ENVIRONMENT=test`.
 2. **Registration guard** — `app/main.py` only imports + mounts the
-   router when `CUBROX_TEST_SEED_ENABLED=true`. Production Cloud Run
+   router when `MASTERKEY_TEST_SEED_ENABLED=true`. Production Cloud Run
    revisions do not set this var, so the seed router is never loaded.
 
 The Python test suite covers the import guard

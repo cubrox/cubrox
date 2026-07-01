@@ -225,7 +225,7 @@ jobs:
 
   a11y:
     # Accessibility & WCAG gate (A11Y-3 #26). Boots the FastAPI app with
-    # CUBROX_TEST_SEED_ENABLED=true so the test-only seed router is
+    # MASTERKEY_TEST_SEED_ENABLED=true so the test-only seed router is
     # mounted, then runs Playwright + axe-core against the reading
     # surface across four preference variants. Zero serious/critical
     # WCAG 2.0 A+AA violations is the merge gate.
@@ -314,7 +314,7 @@ jobs:
 
       - name: Run accessibility tests
         working-directory: tests/a11y
-        # CUBROX_TEST_SEED_ENABLED, SESSION_COOKIE_SECURE, and
+        # MASTERKEY_TEST_SEED_ENABLED, SESSION_COOKIE_SECURE, and
         # ENVIRONMENT are also set inside playwright.config.ts >
         # webServer.env, so the FastAPI subprocess sees them
         # regardless of whether the job-level env propagates.
@@ -322,7 +322,7 @@ jobs:
         # Supabase stack" step above) and are forwarded into the
         # uvicorn subprocess by playwright.config.ts.
         env:
-          CUBROX_TEST_SEED_ENABLED: 'true'
+          MASTERKEY_TEST_SEED_ENABLED: 'true'
           SESSION_COOKIE_SECURE: 'false'
           ENVIRONMENT: 'test'
         run: npx playwright test

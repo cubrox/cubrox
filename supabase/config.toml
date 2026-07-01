@@ -2,11 +2,11 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 #
 # Remote project ref: gnswmcgaztcxslirulwm
-# Org: vibeacademy · Plan: Pro · Branching: enabled (auto-branching via Supabase GitHub App)
+# Org: cubrox · Plan: Pro · Branching: enabled (auto-branching via Supabase GitHub App)
 #
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "cubrox"
+project_id = "masterkey"
 
 [api]
 enabled = true

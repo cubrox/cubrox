@@ -29,7 +29,7 @@ SUPA-2c).
 This router must never load in production:
 
 1. **Module-level guard** (this file): the import itself raises
-   `RuntimeError` unless `CUBROX_TEST_SEED_ENABLED=true` OR
+   `RuntimeError` unless `MASTERKEY_TEST_SEED_ENABLED=true` OR
    `ENVIRONMENT=test`. Belt-and-braces — even a stray `import` from
    anywhere in the codebase fails loudly.
 
@@ -38,7 +38,7 @@ This router must never load in production:
    So unless the env var is explicitly set, the module is never
    imported in the first place.
 
-The CI a11y job sets `CUBROX_TEST_SEED_ENABLED=true` on the FastAPI
+The CI a11y job sets `MASTERKEY_TEST_SEED_ENABLED=true` on the FastAPI
 process via `playwright.config.ts > webServer.env`. Production Cloud
 Run revisions do not set this var; the seed router cannot be reached.
 """
@@ -63,12 +63,12 @@ from app.models.preference import Preference
 from app.services.comprehension import cache as comprehension_cache
 from app.services.comprehension.prompts import PROMPT_VERSION
 
-_SEED_ENABLED = os.environ.get("CUBROX_TEST_SEED_ENABLED") == "true"
+_SEED_ENABLED = os.environ.get("MASTERKEY_TEST_SEED_ENABLED") == "true"
 _TEST_ENV = os.environ.get("ENVIRONMENT") == "test"
 if not (_SEED_ENABLED or _TEST_ENV):
     raise RuntimeError(
         "app.api.test_seed loaded in non-test environment. "
-        "Set CUBROX_TEST_SEED_ENABLED=true (test envs only) or "
+        "Set MASTERKEY_TEST_SEED_ENABLED=true (test envs only) or "
         "ENVIRONMENT=test to enable."
     )
 

@@ -218,20 +218,20 @@ def test_reading_view_template_contains_close_beacon(client: TestClient, session
     assert f'hx-post="/passages/{passage.id}/close"' in body
     assert 'hx-trigger="unload from:body"' in body
     # The hx-vals JS expression pulls from the inline-script-set global.
-    assert "window.cubroxLineCount" in body
+    assert "window.masterkeyLineCount" in body
 
 
 def test_reading_view_template_contains_line_count_script(
     client: TestClient, session: Session
 ) -> None:
     """The inline <script> that measures the rendered <article>'s
-    height and sets window.cubroxLineCount must be present. Pin it
+    height and sets window.masterkeyLineCount must be present. Pin it
     so a future refactor doesn't silently drop the measurement."""
     user = signed_in(session)
     passage = _make_passage(session, user.id)
 
     body = client.get(f"/read/{passage.id}").text
-    assert "window.cubroxLineCount" in body
+    assert "window.masterkeyLineCount" in body
     # The script reads computed line-height — pin the property reference
     # so a refactor that drops it surfaces here, not in production.
     assert "lineHeight" in body

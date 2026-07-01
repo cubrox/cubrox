@@ -68,8 +68,8 @@ Repository variables (non-sensitive):
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `GCP_REGION` | `us-central1` | Cloud Run + Artifact Registry region |
-| `ARTIFACT_REPO` | `agile-flow` | Artifact Registry repo name |
-| `CLOUD_RUN_SERVICE` | `agile-flow-app` | Cloud Run service name |
+| `ARTIFACT_REPO` | `masterkey` | Artifact Registry repo name |
+| `CLOUD_RUN_SERVICE` | `masterkey` | Cloud Run service name |
 | `APP_URL` | (none) | Runtime env var for self-referential URL construction |
 | `NEON_DB_USER` | `neondb_owner` | Neon database role |
 
@@ -304,8 +304,8 @@ Follow the Agent Output Format standard in CLAUDE.md.
 
 ```
 → CI green on main
-→ Previous revision: agile-flow-app-00042-xyz
-→ Built image: us-central1-docker.pkg.dev/myproject/agile-flow/agile-flow-app:abc1234
+→ Previous revision: masterkey-00042-xyz
+→ Built image: us-central1-docker.pkg.dev/myproject/masterkey/masterkey:abc1234
 → Pushed to Artifact Registry
 → Deployed new revision
 → Health check passed (200 OK)
@@ -317,11 +317,11 @@ Follow the Agent Output Format standard in CLAUDE.md.
 ---
 
 **Result:** Production deployed
-Service: agile-flow-app
+Service: masterkey
 Platform: GCP Cloud Run (us-central1)
-New revision: agile-flow-app-00043-abc
-Rollback target: agile-flow-app-00042-xyz
-URL: https://agile-flow-app-xyz.us-central1.run.app
+New revision: masterkey-00043-abc
+Rollback target: masterkey-00042-xyz
+URL: https://masterkey-xyz.us-central1.run.app
 Status: healthy
 ```
 

@@ -4,7 +4,7 @@
 
 - **Hosting**: gcp
 - **Compute**: Cloud Run
-- **Database**: Neon
+- **Database**: Supabase Postgres (project ref `gnswmcgaztcxslirulwm`)
 - **Selected**: 2026-05-02
 
 ## Stack
@@ -26,7 +26,7 @@
 
 ## Required secrets (Google Secret Manager → Cloud Run env)
 
-- `database-url` — Neon pooled connection string
+- `database-url` — Supabase pooled connection string
 - `anthropic-api-key` — Claude API key
 - `resend-api-key` — transactional email
 - `session-secret` — `itsdangerous` signing key (32 random bytes)
@@ -34,5 +34,6 @@
 ## Required GitHub Actions secrets
 
 - `GCP_PROJECT_ID`, `GCP_SERVICE_ACCOUNT`, `GCP_WORKLOAD_IDENTITY_PROVIDER`
-- `NEON_PROJECT_ID`, `NEON_API_KEY`, `PRODUCTION_DATABASE_URL`
-- `NEON_PARENT_BRANCH` (optional, defaults to `main`)
+- `SUPABASE_ACCESS_TOKEN` — for `supabase` CLI in CI (migrations, branching)
+- `SUPABASE_DB_URL` — session-pooler URL used by `baseline-migrations.yml`
+- `PRODUCTION_DATABASE_URL` — Supabase pooled URL for runtime

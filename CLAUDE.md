@@ -161,7 +161,7 @@ Every agent output MUST follow these patterns. Full spec: `docs/AGENT-OUTPUT-STA
 ### Project Information
 
 - **License**: BSL 1.1 (converts to Apache 2.0 after 3 years per release)
-- **Project Name**: Cubrox (rename to Masterkey in flight — see plan v4.1)
+- **Project Name**: Master Key
 - **Repository**: https://github.com/cubrox/cubrox
 - **Project Board**: https://github.com/users/cubrox/projects/2
 - **Tech Stack**: FastAPI + Jinja2 + HTMX on Python 3.12
@@ -193,7 +193,7 @@ supabase start                                   # Start local Supabase stack (n
 supabase stop                                    # Stop local Supabase stack
 supabase status                                  # Show local stack URLs + keys
 supabase db reset                                # Reset local DB and re-apply migrations
-docker build -t agile-flow-app .                 # Local container build
+docker build -t masterkey .                      # Local container build
 ```
 
 ### Definition of Ready

@@ -1,0 +1,1097 @@
+{
+  "snapshot_of": "vibeacademy/projects/29",
+  "title": "cubrox",
+  "snapshotted_at": "2026-07-01T04:45:00Z",
+  "total_count": 121,
+  "items": [
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9b0",
+      "type": "ISSUE",
+      "number": 3,
+      "title": "EPIC: Identity & Sessions",
+      "url": "https://github.com/cubrox/masterkey/issues/3",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9b4",
+      "type": "ISSUE",
+      "number": 4,
+      "title": "EPIC: Passage Ingestion",
+      "url": "https://github.com/cubrox/masterkey/issues/4",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9b8",
+      "type": "ISSUE",
+      "number": 5,
+      "title": "EPIC: Reading Surface",
+      "url": "https://github.com/cubrox/masterkey/issues/5",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9cA",
+      "type": "ISSUE",
+      "number": 6,
+      "title": "EPIC: Comprehension Questions",
+      "url": "https://github.com/cubrox/masterkey/issues/6",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9cE",
+      "type": "ISSUE",
+      "number": 7,
+      "title": "EPIC: Reading-Event Metric",
+      "url": "https://github.com/cubrox/masterkey/issues/7",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9cI",
+      "type": "ISSUE",
+      "number": 8,
+      "title": "EPIC: Accessibility & WCAG Gate",
+      "url": "https://github.com/cubrox/masterkey/issues/8",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9cM",
+      "type": "ISSUE",
+      "number": 29,
+      "title": "[ALERT] Agent Restriction Verification Failed - 2026-05-03",
+      "url": "https://github.com/cubrox/masterkey/issues/29",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9cQ",
+      "type": "ISSUE",
+      "number": 59,
+      "title": "EPIC: Neon Auth migration (replace Resend magic-link with Neon Auth + JWT)",
+      "url": "https://github.com/cubrox/masterkey/issues/59",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9cU",
+      "type": "ISSUE",
+      "number": 61,
+      "title": "AUTH-6 — Enable Neon Auth in Console for prod + dev branches; capture URLs and keys",
+      "url": "https://github.com/cubrox/masterkey/issues/61",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9cY",
+      "type": "ISSUE",
+      "number": 62,
+      "title": "AUTH-7 — Plumb Neon Auth env vars through deploy workflows + Secret Manager",
+      "url": "https://github.com/cubrox/masterkey/issues/62",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9cc",
+      "type": "ISSUE",
+      "number": 63,
+      "title": "AUTH-8 — neon_auth_client.py: REST wrapper + defensive Pydantic models",
+      "url": "https://github.com/cubrox/masterkey/issues/63",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9cg",
+      "type": "ISSUE",
+      "number": 64,
+      "title": "AUTH-9 — jwt_session.py: PyJWT + JWKS client + current_user_jwt dependency",
+      "url": "https://github.com/cubrox/masterkey/issues/64",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9ck",
+      "type": "ISSUE",
+      "number": 65,
+      "title": "AUTH-10 — Sign-in template with vanilla-JS sign-in island + CSP update",
+      "url": "https://github.com/cubrox/masterkey/issues/65",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9co",
+      "type": "ISSUE",
+      "number": 66,
+      "title": "AUTH-11 — AUTH_PROVIDER feature flag + rollback runbook in PATTERN-LIBRARY",
+      "url": "https://github.com/cubrox/masterkey/issues/66",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9cs",
+      "type": "ISSUE",
+      "number": 67,
+      "title": "AUTH-12 — Test-seed multi-key JWT path so Playwright a11y suite survives cutover",
+      "url": "https://github.com/cubrox/masterkey/issues/67",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9cw",
+      "type": "ISSUE",
+      "number": 68,
+      "title": "AUTH-13 — Wire existing (IP, email) rate limiter into Neon Auth code path",
+      "url": "https://github.com/cubrox/masterkey/issues/68",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9c0",
+      "type": "ISSUE",
+      "number": 69,
+      "title": "AUTH-14 — Synthetic auth monitor (Cloud Run Job every 15 min) with alerting",
+      "url": "https://github.com/cubrox/masterkey/issues/69",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9c4",
+      "type": "ISSUE",
+      "number": 70,
+      "title": "AUTH-15 — Verify shared-SMTP deliverability across major mailbox providers",
+      "url": "https://github.com/cubrox/masterkey/issues/70",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9c8",
+      "type": "ISSUE",
+      "number": 71,
+      "title": "AUTH-16 — Spike: verify Neon Auth wildcard trusted-domain feature against Cloud Run preview URLs",
+      "url": "https://github.com/cubrox/masterkey/issues/71",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9dA",
+      "type": "ISSUE",
+      "number": 72,
+      "title": "AUTH-17 — Dogfooding window: 1 week PR previews + 1 week production single-user",
+      "url": "https://github.com/cubrox/masterkey/issues/72",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9dE",
+      "type": "ISSUE",
+      "number": 73,
+      "title": "AUTH-18 — Production flip: full traffic to AUTH_PROVIDER=neon",
+      "url": "https://github.com/cubrox/masterkey/issues/73",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9dM",
+      "type": "ISSUE",
+      "number": 74,
+      "title": "AUTH-19 — Cleanup PR A: remove Resend code path (gated on 2 weeks clean post-T12)",
+      "url": "https://github.com/cubrox/masterkey/issues/74",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9dQ",
+      "type": "ISSUE",
+      "number": 75,
+      "title": "AUTH-20 — Cleanup PR B: drop magic_link_token table (Alembic migration)",
+      "url": "https://github.com/cubrox/masterkey/issues/75",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9dU",
+      "type": "ISSUE",
+      "number": 76,
+      "title": "AUTH-21 — Cleanup PR C: remove RESEND_API_KEY secret + resend dependency",
+      "url": "https://github.com/cubrox/masterkey/issues/76",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtn9dY",
+      "type": "ISSUE",
+      "number": 77,
+      "title": "AUTH-22 — Cleanup PR D: remove AUTH_PROVIDER feature flag (epic closeout)",
+      "url": "https://github.com/cubrox/masterkey/issues/77",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtoAak",
+      "type": "ISSUE",
+      "number": 79,
+      "title": "EPIC: Supabase replatform — consolidate persistence + auth (drop Neon + Resend)",
+      "url": "https://github.com/cubrox/masterkey/issues/79",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtoAew",
+      "type": "ISSUE",
+      "number": 80,
+      "title": "SUPA-1 — Provision Supabase project + local dev setup",
+      "url": "https://github.com/cubrox/masterkey/issues/80",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtoAfU",
+      "type": "ISSUE",
+      "number": 81,
+      "title": "SUPA-2 — DB migration: Alembic → Supabase SQL + RLS",
+      "url": "https://github.com/cubrox/masterkey/issues/81",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtoAfg",
+      "type": "ISSUE",
+      "number": 82,
+      "title": "SUPA-3 — Auth rewrite: replace hand-rolled magic-link with Supabase GoTrue",
+      "url": "https://github.com/cubrox/masterkey/issues/82",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtoAfo",
+      "type": "ISSUE",
+      "number": 83,
+      "title": "SUPA-4 — CI/infra cutover: Neon branching → Supabase branching",
+      "url": "https://github.com/cubrox/masterkey/issues/83",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtoAfw",
+      "type": "ISSUE",
+      "number": 84,
+      "title": "SUPA-5 — Test rework: Supabase local fixtures + auth test rewrite",
+      "url": "https://github.com/cubrox/masterkey/issues/84",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtoAf0",
+      "type": "ISSUE",
+      "number": 85,
+      "title": "SUPA-6 — Cleanup: drop deps, write ADR-003, update docs",
+      "url": "https://github.com/cubrox/masterkey/issues/85",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtoj8I",
+      "type": "ISSUE",
+      "number": 87,
+      "title": "SUPA-2b — Delete legacy User + MagicLinkToken + alembic (post-SUPA-3)",
+      "url": "https://github.com/cubrox/masterkey/issues/87",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtp61E",
+      "type": "ISSUE",
+      "number": 91,
+      "title": "SUPA-2c — Destructive cleanup: delete shim, rename user_id→owner_id, swap DATABASE_URL",
+      "url": "https://github.com/cubrox/masterkey/issues/91",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtub4k",
+      "type": "ISSUE",
+      "number": 93,
+      "title": "ci: auto-fix workflow's GITHUB_TOKEN push leaves PRs stuck in BLOCKED state",
+      "url": "https://github.com/cubrox/masterkey/issues/93",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtuwbQ",
+      "type": "ISSUE",
+      "number": 97,
+      "title": "test(a11y): restore Playwright seed via Supabase admin API (post-SUPA-2c)",
+      "url": "https://github.com/cubrox/masterkey/issues/97",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgtu3CI",
+      "type": "ISSUE",
+      "number": 99,
+      "title": "ci: inject per-PR Supabase branch DATABASE_URL into preview Cloud Run (post-SUPA-4)",
+      "url": "https://github.com/cubrox/masterkey/issues/99",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgt2ojM",
+      "type": "ISSUE",
+      "number": 103,
+      "title": "BUG-3 — Paste and PDF upload return 500 Internal Server Error in production",
+      "url": "https://github.com/cubrox/masterkey/issues/103",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgt20cE",
+      "type": "ISSUE",
+      "number": 105,
+      "title": "BUG-4 — Production schema still has user_id (column owner_id of relation passage does not exist)",
+      "url": "https://github.com/cubrox/masterkey/issues/105",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zguoi6s",
+      "type": "ISSUE",
+      "number": 121,
+      "title": "A11Y-4 — accessibility coverage for the login + verify flow",
+      "url": "https://github.com/cubrox/masterkey/issues/121",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zguoqWU",
+      "type": "ISSUE",
+      "number": 123,
+      "title": "COMP-4 — interactive comprehension answering (self-assess vs. source-grounded model answers)",
+      "url": "https://github.com/cubrox/masterkey/issues/123",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zguv_Rs",
+      "type": "ISSUE",
+      "number": 126,
+      "title": "A11Y-5 — axe-scan the live comprehension questions panel (close #124 coverage gap)",
+      "url": "https://github.com/cubrox/masterkey/issues/126",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zguwGME",
+      "type": "ISSUE",
+      "number": 128,
+      "title": "COMP-5 — disable comprehension questions per passage (Risk #2 mitigation)",
+      "url": "https://github.com/cubrox/masterkey/issues/128",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgu23ac",
+      "type": "ISSUE",
+      "number": 131,
+      "title": "OPS-1 — harden production auth reliability: warm instance + monitor alerting",
+      "url": "https://github.com/cubrox/masterkey/issues/131",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgu270I",
+      "type": "ISSUE",
+      "number": 133,
+      "title": "OPS-2 — M1 launch checklist / go-live runbook",
+      "url": "https://github.com/cubrox/masterkey/issues/133",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgvFgBc",
+      "type": "ISSUE",
+      "number": 137,
+      "title": "BUG-5 — comprehension 'unavailable' on first real generation (strict parser + unwrapped API call)",
+      "url": "https://github.com/cubrox/masterkey/issues/137",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgvFmGU",
+      "type": "ISSUE",
+      "number": 139,
+      "title": "OPS-3 — production migrations don't apply automatically (root cause of BUG-4 + today's paste-500)",
+      "url": "https://github.com/cubrox/masterkey/issues/139",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgvNWCw",
+      "type": "ISSUE",
+      "number": 143,
+      "title": "OPS-4 — post-deploy smoke test that exercises a DB write (paste)",
+      "url": "https://github.com/cubrox/masterkey/issues/143",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgvVYOY",
+      "type": "ISSUE",
+      "number": 145,
+      "title": "INGEST-3 — auto-split large documents into navigable parts (no manual splitting)",
+      "url": "https://github.com/cubrox/masterkey/issues/145",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgvVnWw",
+      "type": "ISSUE",
+      "number": 148,
+      "title": "COMP-6 — generate comprehension questions for long passages (truncate, don't reject)",
+      "url": "https://github.com/cubrox/masterkey/issues/148",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgvkdsc",
+      "type": "ISSUE",
+      "number": 154,
+      "title": "BUG-6 — reading width inconsistent across computers (ch unit depends on rendered font)",
+      "url": "https://github.com/cubrox/masterkey/issues/154",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgvkj3w",
+      "type": "ISSUE",
+      "number": 156,
+      "title": "READ — move reading-preference controls to the top of the reading view",
+      "url": "https://github.com/cubrox/masterkey/issues/156",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgwvNCk",
+      "type": "ISSUE",
+      "number": 165,
+      "title": "READ-P2-1 — Add letter-spacing, word-spacing, and paragraph-spacing reading preferences",
+      "url": "https://github.com/cubrox/masterkey/issues/165",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgwvNOg",
+      "type": "ISSUE",
+      "number": 166,
+      "title": "ANALYTICS-1 — Capture active preferences snapshot on reading events for mode-correlation analysis",
+      "url": "https://github.com/cubrox/masterkey/issues/166",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgwvNaw",
+      "type": "ISSUE",
+      "number": 167,
+      "title": "OBS-1 — Add Sentry SDK for production error tracking (ADR-004 Phase 2 deferral)",
+      "url": "https://github.com/cubrox/masterkey/issues/167",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgwvN1Q",
+      "type": "ISSUE",
+      "number": 168,
+      "title": "READ-P2-2 — Focus mode: dim non-active reading sections to reduce visual distraction",
+      "url": "https://github.com/cubrox/masterkey/issues/168",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgwvODk",
+      "type": "ISSUE",
+      "number": 169,
+      "title": "INGEST-P2-1 — Strip page headers and footers from PDF text extraction",
+      "url": "https://github.com/cubrox/masterkey/issues/169",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgwvOUc",
+      "type": "ISSUE",
+      "number": 170,
+      "title": "ANALYTICS-2 — Internal analytics dashboard for reading volume and mode-correlation metrics",
+      "url": "https://github.com/cubrox/masterkey/issues/170",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgw3Los",
+      "type": "ISSUE",
+      "number": 172,
+      "title": "INFRA-X: Migrate repository to cubrox/master-key and cubrox org",
+      "url": "https://github.com/cubrox/masterkey/issues/172",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgw3NiQ",
+      "type": "ISSUE",
+      "number": 173,
+      "title": "INFRA-141: Rename repository to cubrox/master-key (second migration phase)",
+      "url": "https://github.com/cubrox/masterkey/issues/173",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgw3OXw",
+      "type": "ISSUE",
+      "number": 174,
+      "title": "INFRA-173.0: Phase 0 — Create GitHub org, copy secrets, verify Supabase",
+      "url": "https://github.com/cubrox/masterkey/issues/174",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgw3OR4",
+      "type": "ISSUE",
+      "number": 175,
+      "title": "INFRA-173.1: Phase 1 — Reference mapping & validation",
+      "url": "https://github.com/cubrox/masterkey/issues/175",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgw3OU4",
+      "type": "ISSUE",
+      "number": 176,
+      "title": "INFRA-173.2: Phase 2 — Code & workflow updates (Feature Branch)",
+      "url": "https://github.com/cubrox/masterkey/issues/176",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgw3OdY",
+      "type": "ISSUE",
+      "number": 177,
+      "title": "INFRA-173.3: Phase 3 — Git remote update (Manual Click-Ops)",
+      "url": "https://github.com/cubrox/masterkey/issues/177",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgw3NyA",
+      "type": "ISSUE",
+      "number": 178,
+      "title": "INFRA-173.4: Phase 4 — Merge & deploy",
+      "url": "https://github.com/cubrox/masterkey/issues/178",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgw3NwM",
+      "type": "ISSUE",
+      "number": 179,
+      "title": "INFRA-173.5: Phase 5 — Documentation & cleanup",
+      "url": "https://github.com/cubrox/masterkey/issues/179",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgw3Pls",
+      "type": "ISSUE",
+      "number": 180,
+      "title": "[ALERT] Synthetic auth monitor failed - 2026-06-25",
+      "url": "https://github.com/cubrox/masterkey/issues/180",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOBCc",
+      "type": "ISSUE",
+      "number": 181,
+      "title": "epic: Phase 0 — Pre-flight discovery & state snapshots",
+      "url": "https://github.com/cubrox/masterkey/issues/181",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOBJQ",
+      "type": "ISSUE",
+      "number": 182,
+      "title": "epic: Phase 1 — Codebase rename PR (cubrox → masterkey identifiers)",
+      "url": "https://github.com/cubrox/masterkey/issues/182",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOB0Q",
+      "type": "ISSUE",
+      "number": 183,
+      "title": "epic: Phase 2 — Repo rename, project board migration, WIF dual-write",
+      "url": "https://github.com/cubrox/masterkey/issues/183",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOCCA",
+      "type": "ISSUE",
+      "number": 184,
+      "title": "epic: Phase 3 — Pre-create masterkey infra and dry-run preview deploys",
+      "url": "https://github.com/cubrox/masterkey/issues/184",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOBWo",
+      "type": "ISSUE",
+      "number": 185,
+      "title": "epic: Phase 4 — Cutover (merge code PR, flip vars, deploy to masterkey)",
+      "url": "https://github.com/cubrox/masterkey/issues/185",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOBSo",
+      "type": "ISSUE",
+      "number": 186,
+      "title": "epic: Phase 5 — Cleanup (delete old service, prune WIF, memory MCP audit)",
+      "url": "https://github.com/cubrox/masterkey/issues/186",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOC-g",
+      "type": "ISSUE",
+      "number": 187,
+      "title": "chore: Inventory legacy vibeacademy/projects/29 board items",
+      "url": "https://github.com/cubrox/masterkey/issues/187",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODB4",
+      "type": "ISSUE",
+      "number": 188,
+      "title": "chore: Snapshot Cloud Run service + revisions + SA IAM + secrets",
+      "url": "https://github.com/cubrox/masterkey/issues/188",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODMY",
+      "type": "ISSUE",
+      "number": 189,
+      "title": "chore: Verify WIF binding shape against provisioning script",
+      "url": "https://github.com/cubrox/masterkey/issues/189",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOC7A",
+      "type": "ISSUE",
+      "number": 190,
+      "title": "chore: Enumerate Cloud Logging metrics, alerts, dashboards",
+      "url": "https://github.com/cubrox/masterkey/issues/190",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOC7M",
+      "type": "ISSUE",
+      "number": 191,
+      "title": "chore: Confirm zero open PRs + enumerate forks, then bundle Phase 0 snapshots into PR",
+      "url": "https://github.com/cubrox/masterkey/issues/191",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODIY",
+      "type": "ISSUE",
+      "number": 192,
+      "title": "refactor: Rename CUBROX_TEST_SEED_ENABLED env var across code, tests, ci.yml",
+      "url": "https://github.com/cubrox/masterkey/issues/192",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODQA",
+      "type": "ISSUE",
+      "number": 193,
+      "title": "refactor: Rename window.cubroxLineCount → window.masterkeyLineCount",
+      "url": "https://github.com/cubrox/masterkey/issues/193",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODDM",
+      "type": "ISSUE",
+      "number": 194,
+      "title": "refactor: Rename app metadata strings (FastAPI title, metric prog name, docstrings)",
+      "url": "https://github.com/cubrox/masterkey/issues/194",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODP0",
+      "type": "ISSUE",
+      "number": 195,
+      "title": "refactor: Rename tests/a11y package and update fixture URLs",
+      "url": "https://github.com/cubrox/masterkey/issues/195",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODIA",
+      "type": "ISSUE",
+      "number": 196,
+      "title": "refactor: Rename scripts/provision-gcp-project.sh and scripts/diagnose-cloudrun.sh defaults",
+      "url": "https://github.com/cubrox/masterkey/issues/196",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODRU",
+      "type": "ISSUE",
+      "number": 197,
+      "title": "docs: Update supabase/config.toml project_id and CLAUDE.md project information block",
+      "url": "https://github.com/cubrox/masterkey/issues/197",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODQI",
+      "type": "ISSUE",
+      "number": 198,
+      "title": "refactor: Apply .gembaflow-overrides agent persona renames and PROJECT.md Supabase fix",
+      "url": "https://github.com/cubrox/masterkey/issues/198",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODR8",
+      "type": "ISSUE",
+      "number": 199,
+      "title": "chore: Disable synthetic monitor schedule for cutover window",
+      "url": "https://github.com/cubrox/masterkey/issues/199",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODgQ",
+      "type": "ISSUE",
+      "number": 200,
+      "title": "infra: Dual-write WIF binding for cubrox/masterkey on deployer SA",
+      "url": "https://github.com/cubrox/masterkey/issues/200",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODh0",
+      "type": "ISSUE",
+      "number": 201,
+      "title": "infra: Rename GitHub repo cubrox/cubrox → cubrox/masterkey",
+      "url": "https://github.com/cubrox/masterkey/issues/201",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODjQ",
+      "type": "ISSUE",
+      "number": 202,
+      "title": "infra: Create new project board at github.com/users/cubrox/projects/<n>",
+      "url": "https://github.com/cubrox/masterkey/issues/202",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODko",
+      "type": "ISSUE",
+      "number": 203,
+      "title": "chore: Migrate all 67 items (open + closed) from vibeacademy/projects/29 to new board",
+      "url": "https://github.com/cubrox/masterkey/issues/203",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxODzQ",
+      "type": "ISSUE",
+      "number": 204,
+      "title": "infra: Create masterkey Artifact Registry repo + grant runtime SA reader",
+      "url": "https://github.com/cubrox/masterkey/issues/204",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOD04",
+      "type": "ISSUE",
+      "number": 205,
+      "title": "infra: Pre-create Cloud Run masterkey service with correct env-var types (R13)",
+      "url": "https://github.com/cubrox/masterkey/issues/205",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOD24",
+      "type": "ISSUE",
+      "number": 206,
+      "title": "docs: Capture new service URL and pin into LAUNCH-CHECKLIST + CLAUDE.md",
+      "url": "https://github.com/cubrox/masterkey/issues/206",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOD4w",
+      "type": "ISSUE",
+      "number": 207,
+      "title": "chore: Add new production + preview Supabase Auth redirect URLs to allowlist",
+      "url": "https://github.com/cubrox/masterkey/issues/207",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOD6U",
+      "type": "ISSUE",
+      "number": 208,
+      "title": "test: Dry-run preview-deploy + preview-cleanup + Supabase branching against masterkey",
+      "url": "https://github.com/cubrox/masterkey/issues/208",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOD8Y",
+      "type": "ISSUE",
+      "number": 209,
+      "title": "chore: Verify Supabase GitHub App allowlist still contains cubrox/masterkey (R10 follow-through)",
+      "url": "https://github.com/cubrox/masterkey/issues/209",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOE74",
+      "type": "ISSUE",
+      "number": 210,
+      "title": "release: Merge Phase 1 PR with vars STILL pointing at agile-flow-app",
+      "url": "https://github.com/cubrox/masterkey/issues/210",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOE-U",
+      "type": "ISSUE",
+      "number": 211,
+      "title": "verify: Confirm agile-flow-app health post-merge before var flip",
+      "url": "https://github.com/cubrox/masterkey/issues/211",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOE_8",
+      "type": "ISSUE",
+      "number": 212,
+      "title": "infra: Flip GitHub vars (CLOUD_RUN_SERVICE + ARTIFACT_REPO) to masterkey",
+      "url": "https://github.com/cubrox/masterkey/issues/212",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOFBc",
+      "type": "ISSUE",
+      "number": 213,
+      "title": "release: Push trivial CHANGELOG commit to trigger deploy to masterkey",
+      "url": "https://github.com/cubrox/masterkey/issues/213",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOFDA",
+      "type": "ISSUE",
+      "number": 214,
+      "title": "verify: Confirm masterkey service health after first real deploy",
+      "url": "https://github.com/cubrox/masterkey/issues/214",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOFEI",
+      "type": "ISSUE",
+      "number": 215,
+      "title": "chore: Re-enable synthetic monitor schedule (follow-up PR)",
+      "url": "https://github.com/cubrox/masterkey/issues/215",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOFF4",
+      "type": "ISSUE",
+      "number": 216,
+      "title": "docs: Announce new production URL and update external references",
+      "url": "https://github.com/cubrox/masterkey/issues/216",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOFT4",
+      "type": "ISSUE",
+      "number": 217,
+      "title": "infra: Delete old Cloud Run service agile-flow-app",
+      "url": "https://github.com/cubrox/masterkey/issues/217",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOFVM",
+      "type": "ISSUE",
+      "number": 218,
+      "title": "infra: Archive image manifests + delete old Artifact Registry repo agile-flow",
+      "url": "https://github.com/cubrox/masterkey/issues/218",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOFWs",
+      "type": "ISSUE",
+      "number": 219,
+      "title": "chore: Remove old Supabase Auth allowlist entries (production + preview)",
+      "url": "https://github.com/cubrox/masterkey/issues/219",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOFXw",
+      "type": "ISSUE",
+      "number": 220,
+      "title": "infra: Remove old WIF binding for cubrox/cubrox on deployer SA",
+      "url": "https://github.com/cubrox/masterkey/issues/220",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOFYU",
+      "type": "ISSUE",
+      "number": 221,
+      "title": "chore: Update Cloud Logging saved queries / dashboards / alerts (likely no-op)",
+      "url": "https://github.com/cubrox/masterkey/issues/221",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOFZo",
+      "type": "ISSUE",
+      "number": 222,
+      "title": "chore: Memory MCP audit — rename or alias cubrox entities",
+      "url": "https://github.com/cubrox/masterkey/issues/222",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOFaU",
+      "type": "ISSUE",
+      "number": 223,
+      "title": "docs: Write ADR-007 \"Rename to Master Key / masterkey\" and resolve PLATFORM-GUIDE drift",
+      "url": "https://github.com/cubrox/masterkey/issues/223",
+      "content_state": "OPEN",
+      "status": "Backlog"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOR9A",
+      "type": "ISSUE",
+      "number": 224,
+      "title": "epic: Phase -1 — Framework alignment (agile-flow → gembaflow + v1.5.0 upgrade)",
+      "url": "https://github.com/cubrox/masterkey/issues/224",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOSmg",
+      "type": "ISSUE",
+      "number": 225,
+      "title": "chore: Snapshot pre-rebrand state and capture v1.3.0 baseline",
+      "url": "https://github.com/cubrox/masterkey/issues/225",
+      "content_state": "CLOSED",
+      "status": "In progress"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOSm4",
+      "type": "ISSUE",
+      "number": 226,
+      "title": "chore: Bridge-edit local scripts/template-sync.sh paths (.agile-flow-* → .gembaflow-*)",
+      "url": "https://github.com/cubrox/masterkey/issues/226",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOSnc",
+      "type": "ISSUE",
+      "number": 227,
+      "title": "chore: Manual curl-refresh of runtime-protected scripts (v1.5.0 release-notes mandate)",
+      "url": "https://github.com/cubrox/masterkey/issues/227",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOSoE",
+      "type": "ISSUE",
+      "number": 228,
+      "title": "chore: Run template-sync.sh — actual v1.3.0 → v1.5.0 upgrade",
+      "url": "https://github.com/cubrox/masterkey/issues/228",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOSoc",
+      "type": "ISSUE",
+      "number": 229,
+      "title": "chore: Reconcile .gembaflow-overrides against post-sync file list; create .gembaflow-config.json",
+      "url": "https://github.com/cubrox/masterkey/issues/229",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOSpI",
+      "type": "ISSUE",
+      "number": 230,
+      "title": "docs: Update Agile Flow → Gemba Flow strings in CLAUDE.md, UPSTREAM.md, VERSIONING.md; add json-validate to branch-protection",
+      "url": "https://github.com/cubrox/masterkey/issues/230",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOSpY",
+      "type": "ISSUE",
+      "number": 231,
+      "title": "chore: Verification, smoke tests, and open PR for framework alignment",
+      "url": "https://github.com/cubrox/masterkey/issues/231",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOosw",
+      "type": "ISSUE",
+      "number": 233,
+      "title": "infra: split ci.yml typecheck job into json-validate + version-parity; add both to ruleset 15886599",
+      "url": "https://github.com/cubrox/masterkey/issues/233",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxOvdQ",
+      "type": "ISSUE",
+      "number": 234,
+      "title": "chore(config): align bot.reviewer=tck517 to match bot.worker (solo-mode consistency)",
+      "url": "https://github.com/cubrox/masterkey/issues/234",
+      "content_state": "CLOSED",
+      "status": "Done"
+    },
+    {
+      "id": "PVTI_lADODjeGB84BYmy4zgxVmuk",
+      "type": "ISSUE",
+      "number": 237,
+      "title": "infra: Provision new GCP project as masterkey from day 1 (replaces inaccessible production project)",
+      "url": "https://github.com/cubrox/masterkey/issues/237",
+      "content_state": "CLOSED",
+      "status": "Done"
+    }
+  ]
+}

@@ -46,7 +46,7 @@
   {#
     METRIC-2: emit one reading_event on unload. The inline <script>
     measures the rendered <article>'s height in line-heights and stashes
-    the count on `window.cubroxLineCount`. The hidden <div> below uses
+    the count on `window.masterkeyLineCount`. The hidden <div> below uses
     hx-trigger="unload from:body" so HTMX fires the POST when the user
     leaves the page (close tab, navigate away, refresh). hx-vals 'js:'
     pulls the count from the window at fire time, not at render time.
@@ -57,7 +57,7 @@
     (function () {
       var surface = document.getElementById("reading-surface");
       if (!surface) {
-        window.cubroxLineCount = 1;
+        window.masterkeyLineCount = 1;
         return;
       }
       // Use computed line-height so a user's preference change (toggled
@@ -70,13 +70,13 @@
         lineHeight = parseFloat(cs.fontSize) * 1.2;
       }
       var lines = Math.max(1, Math.round(surface.scrollHeight / lineHeight));
-      window.cubroxLineCount = lines;
+      window.masterkeyLineCount = lines;
     })();
   </script>
   <div id="reading-close-beacon"
        hx-post="/passages/{{ passage.id }}/close"
        hx-trigger="unload from:body"
-       hx-vals='js:{lines: window.cubroxLineCount}'
+       hx-vals='js:{lines: window.masterkeyLineCount}'
        hx-swap="none"
        aria-hidden="true"
        style="display:none"></div>

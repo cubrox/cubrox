@@ -2,7 +2,7 @@
 
 GET / serves two audiences in one URL:
 
-  - **Anonymous visitors** see the Cubrox landing page with the
+  - **Anonymous visitors** see the Masterkey landing page with the
     sign-in form. The form posts to /login (AUTH-1) via HTMX, so a
     successful submit swaps the form for the "check your inbox"
     fragment without a page reload.

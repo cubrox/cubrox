@@ -27,7 +27,7 @@ DEFAULT_LOOKBACK_DAYS = 90
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="cubrox-metric",
+        prog="masterkey-metric",
         description="Print reading-event totals since a given date.",
     )
     parser.add_argument(

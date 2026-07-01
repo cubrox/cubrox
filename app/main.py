@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import auth, health, home, passages, reading, todos
 from app.integrations.supabase.auth import UnauthenticatedError
 
-app = FastAPI(title="Agile Flow GCP")
+app = FastAPI(title="Master Key")
 
 
 @app.exception_handler(UnauthenticatedError)

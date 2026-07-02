@@ -29,6 +29,7 @@ from typing import Annotated
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
+from supabase_auth.errors import AuthApiError
 
 from app.config import Settings, get_settings
 from app.integrations.supabase.auth import SUPABASE_COOKIE_NAME, current_user
@@ -81,9 +82,15 @@ def login(
     Supabase will create the user on first verify, and we deliberately
     don't surface "unknown email" so this route can't enumerate.
 
-    Only failure visible to the client is a 422 for malformed-format
-    input. Errors from Supabase (rate limit at their layer, transient)
-    surface as 502.
+    Failures visible to the client:
+      - 422 for malformed email format.
+      - 429 with Retry-After when Supabase's shared SMTP pool rate-
+        limits us (#247, from #245 postmortem) — the app maps this to
+        a user-facing "try again in a few minutes" message so HTMX/
+        browsers back off gracefully. Custom SMTP via Resend (#246)
+        moves rate limits off Supabase's shared pool structurally.
+      - 502 for anything else (network, config bug, non-rate-limit
+        Supabase error). Enumeration guard: generic message.
     """
     try:
         result = validate_email(email, check_deliverability=False)
@@ -101,9 +108,23 @@ def login(
                 "options": {"email_redirect_to": redirect_url},
             }
         )
+    except AuthApiError as exc:
+        # Supabase-side error. Distinguish rate limits from everything
+        # else so users get an actionable message and operators get a
+        # meaningful status code (429 is the standard signal that
+        # HTMX/browsers already know how to back off from). Enumeration
+        # guard: we don't echo Supabase's message verbatim for non-rate-
+        # limit errors (which can leak whether an email is known).
+        if exc.code == "over_email_send_rate_limit" or "rate limit" in exc.message.lower():
+            raise HTTPException(
+                status_code=429,
+                detail="Too many sign-in emails just now. Please try again in a few minutes.",
+                headers={"Retry-After": "300"},
+            ) from exc
+        raise HTTPException(status_code=502, detail="Sign-in unavailable") from exc
     except Exception as exc:
-        # Don't leak Supabase internals; log via Cloud Logging and
-        # return a 502 so the client knows the upstream failed.
+        # Non-Supabase failure (network, config, code bug). Same 502 as
+        # before so operators can spot the class from Cloud Logging.
         raise HTTPException(status_code=502, detail="Sign-in unavailable") from exc
 
     return GENERIC_FRAGMENT

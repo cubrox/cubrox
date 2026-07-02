@@ -100,10 +100,18 @@ def test_supabase_rate_limit_returns_429_with_retry_after(
     )
     response = client.post("/login", data={"email": "reader@example.com"})
     assert response.status_code == 429
-    assert "Retry-After" in response.headers
-    assert response.headers["Retry-After"] == "300"
-    detail = response.json()["detail"]
-    assert "try again" in detail.lower()
+    assert response.headers.get("Retry-After") == "300"
+    # HTML fragment, not JSON — HTMX response-targets ext (#250) swaps this
+    # into #signin-form directly so the user sees the message.
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    assert "try again" in body.lower()
+    # Fragment re-renders the sign-in form so the user can retry, AND carries
+    # the response-targets wiring so a subsequent 429 also swaps back into
+    # the form (not just the first one).
+    assert 'id="signin-form"' in body
+    assert 'hx-post="/login"' in body
+    assert 'hx-target-4*="#signin-form"' in body
 
 
 def test_supabase_rate_limit_by_message_returns_429(

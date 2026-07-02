@@ -20,7 +20,9 @@
   <form id="signin-form"
         hx-post="/login"
         hx-target="#signin-form"
-        hx-swap="outerHTML">
+        hx-swap="outerHTML"
+        hx-ext="response-targets"
+        hx-target-4*="#signin-form">
     <label for="email">
       Email
       <input

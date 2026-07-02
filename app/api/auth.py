@@ -43,6 +43,27 @@ CurrentUser = Annotated[object, Depends(current_user)]  # User; loose typing for
 
 GENERIC_FRAGMENT = "<p>Check your inbox for a sign-in link.</p>"
 
+# Rate-limit fragment: re-renders the sign-in form (so the user can retry with
+# the same or a different address) plus an inline error message HTMX's
+# response-targets ext (#250) swaps into #signin-form on a 429. Kept minimal
+# and self-contained — no template round-trip so the /login handler stays
+# entirely synchronous. Matches the visual shape of the form in
+# templates/home.html so the swap doesn't feel jarring.
+RATE_LIMIT_FRAGMENT = (
+    '<form id="signin-form" hx-post="/login" hx-target="#signin-form"'
+    ' hx-swap="outerHTML" hx-ext="response-targets" hx-target-4*="#signin-form">'
+    '<p role="alert" class="error">Too many sign-in emails just now.'
+    " Please try again in a few minutes.</p>"
+    '<label for="email">Email'
+    '<input type="email" id="email" name="email" required autofocus'
+    ' autocomplete="email" placeholder="you@example.com">'
+    "<small>We'll email you a one-time sign-in link."
+    " No password to remember.</small>"
+    "</label>"
+    '<button type="submit">Send me a sign-in link</button>'
+    "</form>"
+)
+
 # Cookie max-age. Supabase access tokens default to 1 hour but the
 # client refreshes them automatically; the cookie's max-age is the
 # upper bound on how long the user stays signed in across reloads.
@@ -74,7 +95,7 @@ def login(
     request: Request,
     settings: SettingsDep,
     email: Annotated[str, Form()],
-) -> str:
+) -> Response:
     """Issue a Supabase magic-link to the supplied email.
 
     Returns the same 202 + fragment for any well-formed email
@@ -116,18 +137,21 @@ def login(
         # guard: we don't echo Supabase's message verbatim for non-rate-
         # limit errors (which can leak whether an email is known).
         if exc.code == "over_email_send_rate_limit" or "rate limit" in exc.message.lower():
-            raise HTTPException(
+            # Return HTML fragment (not JSON HTTPException) so HTMX's
+            # response-targets ext (#250) can swap it into #signin-form
+            # for the real user to see instead of a silent 4xx.
+            return HTMLResponse(
+                content=RATE_LIMIT_FRAGMENT,
                 status_code=429,
-                detail="Too many sign-in emails just now. Please try again in a few minutes.",
                 headers={"Retry-After": "300"},
-            ) from exc
+            )
         raise HTTPException(status_code=502, detail="Sign-in unavailable") from exc
     except Exception as exc:
         # Non-Supabase failure (network, config, code bug). Same 502 as
         # before so operators can spot the class from Cloud Logging.
         raise HTTPException(status_code=502, detail="Sign-in unavailable") from exc
 
-    return GENERIC_FRAGMENT
+    return HTMLResponse(content=GENERIC_FRAGMENT, status_code=202)
 
 
 @router.get("/auth/callback", response_model=None)

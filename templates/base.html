@@ -11,6 +11,11 @@
 
   <!-- HTMX 2.x core. Add extensions from htmx.org/extensions as needed. -->
   <script src="https://unpkg.com/htmx.org@2.0.3/dist/htmx.min.js"></script>
+  <!-- response-targets: swap 4xx/5xx responses into hx-target-4xx / hx-target-5xx.
+       HTMX 2.x otherwise ignores error responses; we need this so the /login
+       429 rate-limit message actually renders in the sign-in form (#250, from
+       #247/#249 postmortem). Pinned major version for stability. -->
+  <script src="https://unpkg.com/htmx-ext-response-targets@2.0.2/response-targets.js"></script>
 
   <!-- Workshop-specific overrides -->
   <link rel="stylesheet" href="/static/style.css">

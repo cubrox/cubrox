@@ -140,10 +140,19 @@ def login(
             # Return HTML fragment (not JSON HTTPException) so HTMX's
             # response-targets ext (#250) can swap it into #signin-form
             # for the real user to see instead of a silent 4xx.
+            # Supabase's shared-SMTP-pool default is 30 emails per project
+            # per hour. AuthApiError does not surface Supabase's actual
+            # Retry-After (checked upstream: only message/status/code).
+            # 300s (5 min) from #247 was optimistic — a client hitting 429
+            # would often retry back into the same hourly window. 900s
+            # (15 min) is a compromise: long enough to matter for a
+            # sliding-window recovery, short enough not to feel punitive
+            # when the user has a different email in mind. #246 (custom
+            # SMTP via Resend) is the structural fix.
             return HTMLResponse(
                 content=RATE_LIMIT_FRAGMENT,
                 status_code=429,
-                headers={"Retry-After": "300"},
+                headers={"Retry-After": "900"},
             )
         raise HTTPException(status_code=502, detail="Sign-in unavailable") from exc
     except Exception as exc:

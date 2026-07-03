@@ -20,6 +20,7 @@ MagicLinkToken; that whole flow no longer exists.
 
 from unittest.mock import MagicMock
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -114,19 +115,41 @@ def test_supabase_rate_limit_returns_429_with_retry_after(
     assert 'hx-target-4*="#signin-form"' in body
 
 
-def test_supabase_rate_limit_by_message_returns_429(
-    client: TestClient, supabase_mock: MagicMock
+@pytest.mark.parametrize(
+    "code",
+    ["over_email_send_rate_limit", "over_sms_send_rate_limit", "over_request_rate_limit"],
+)
+def test_supabase_rate_limit_codes_return_429(
+    client: TestClient, supabase_mock: MagicMock, code: str
 ) -> None:
-    """Belt-and-suspenders: even if Supabase's error code changes upstream,
-    a message containing 'rate limit' still maps to 429. Covers the case
-    where AuthApiError.code is None but message is descriptive."""
+    """Every rate-limit code on the RATE_LIMIT_CODES whitelist maps to 429.
+    The old message-substring fallback was dropped in #252 — a hypothetical
+    non-rate-limit error whose message happened to contain 'rate limit' should
+    not be misclassified. This test pins the whitelist to keep future edits
+    honest about what counts as rate-limited."""
     from supabase_auth.errors import AuthApiError
 
     supabase_mock.auth.sign_in_with_otp.side_effect = AuthApiError(
-        "Email rate limit exceeded", 429, None
+        "unrelated message text", 429, code
     )
     response = client.post("/login", data={"email": "reader@example.com"})
     assert response.status_code == 429
+
+
+def test_supabase_rate_limit_message_only_no_code_returns_502(
+    client: TestClient, supabase_mock: MagicMock
+) -> None:
+    """Regression guard for #252: an AuthApiError whose message contains
+    'rate limit' but whose code is NOT on the whitelist must NOT be
+    classified as 429. Before #252 this case was mapped to 429 via a
+    message-substring fallback; that fallback was intentionally removed."""
+    from supabase_auth.errors import AuthApiError
+
+    supabase_mock.auth.sign_in_with_otp.side_effect = AuthApiError(
+        "IP-level rate limit reached, check dashboard", 400, "unexpected_failure"
+    )
+    response = client.post("/login", data={"email": "reader@example.com"})
+    assert response.status_code == 502
 
 
 def test_supabase_non_rate_limit_authapierror_returns_502(

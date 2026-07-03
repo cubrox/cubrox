@@ -64,6 +64,20 @@ RATE_LIMIT_FRAGMENT = (
     "</form>"
 )
 
+# AuthApiError codes that indicate a Supabase rate limit — map to 429 not 502.
+# The substring fallback that preceded this (#252, was in #247's PR #249) risked
+# misclassifying unrelated errors whose message happened to contain "rate limit".
+# The whitelist is the explicit inversion: only these codes are 429; everything
+# else (including future codes we haven't seen) is 502 until we add it here.
+# All three are real Supabase codes per supabase-auth-py.
+RATE_LIMIT_CODES = frozenset(
+    {
+        "over_email_send_rate_limit",
+        "over_sms_send_rate_limit",
+        "over_request_rate_limit",
+    }
+)
+
 # Cookie max-age. Supabase access tokens default to 1 hour but the
 # client refreshes them automatically; the cookie's max-age is the
 # upper bound on how long the user stays signed in across reloads.
@@ -136,7 +150,7 @@ def login(
         # HTMX/browsers already know how to back off from). Enumeration
         # guard: we don't echo Supabase's message verbatim for non-rate-
         # limit errors (which can leak whether an email is known).
-        if exc.code == "over_email_send_rate_limit" or "rate limit" in exc.message.lower():
+        if exc.code in RATE_LIMIT_CODES:
             # Return HTML fragment (not JSON HTTPException) so HTMX's
             # response-targets ext (#250) can swap it into #signin-form
             # for the real user to see instead of a silent 4xx.

@@ -1,0 +1,49 @@
+name: Drain Merge Bridge
+
+# Closes the workflow_dispatch / workflow_call gap that ADR-006 deferred.
+# The /drain skill cannot invoke agent-merge.yml directly with dry_run=false
+# (workflow_dispatch is refused for real merges by the gate's safety step).
+# This bridge accepts a repository_dispatch from the skill and calls the
+# gate via workflow_call — the only path through which agent-merge.yml
+# permits real merges per its safety contract.
+#
+# See:
+#   - ADR-007 in docs/TECHNICAL-ARCHITECTURE.md     — architectural rationale
+#   - docs/agent-merge-gate.md §"Drain merge bridge" — operational guide
+#   - .claude/commands/drain.md step 7              — how the skill invokes this
+#
+# Schema of the repository_dispatch payload:
+#   {
+#     "event_type": "drain-merge",
+#     "client_payload": {
+#       "pr_number": <number>
+#     }
+#   }
+#
+# Reverting the bridge: delete this file. The /drain skill's gh api
+# dispatches call then fires a no-op event (no workflow listens for
+# drain-merge). The skill's per-iteration cycle step 7 fails; the drain
+# halts at the gate the same way it does today in v1. No other workflows
+# are affected; merge permission is back to the v1 operator-merges-manually
+# fallback.
+
+on:
+  repository_dispatch:
+    types: [drain-merge]
+
+permissions: {}
+
+jobs:
+  call-gate:
+    name: Call agent-merge.yml via workflow_call
+    uses: ./.github/workflows/agent-merge.yml
+    with:
+      pr_number: ${{ github.event.client_payload.pr_number }}
+      caller: goal-drain
+      dry_run: false
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+      actions: read
+      issues: read

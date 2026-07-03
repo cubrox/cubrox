@@ -1,0 +1,233 @@
+name: Agent Merge Gate
+
+# Conditional unlock that lets the `/drain` skill merge PRs to main
+# autonomously overnight. CLAUDE.md Critical Rule #4 ("Only humans
+# merge PRs") is deliberately overridden here for a narrow trigger
+# context. See:
+#   - docs/agent-merge-gate.md      — operational guide + revert procedure
+#   - docs/safety-classes.md        — the safety:* taxonomy enforced by conditions 1–2
+#
+# Reverting the unlock: delete this file. Drain's call fails; merge
+# permission is back to humans-only with zero other code changes.
+#
+# This workflow ships in the framework's v2-hardened state (per the
+# empirical validation phase in the gembaflow-site downstream fork
+# during 2026-06-08 → 2026-06-10). The hardening includes:
+#   - issues: read permission for the closingIssuesReferences GraphQL
+#     field used by conditions 1–2 (otherwise the gate falsely
+#     reports "PR has no closing-issue reference")
+#   - `caller` input on workflow_dispatch (otherwise `gh workflow run`
+#     with `-f caller=…` returns HTTP 422)
+#   - `IGNORED_CHECKS` env-var allowlist on condition 4 (so informational
+#     checks like a flaky preview-deploy smoke test don't block
+#     legitimate ready-to-merge PRs)
+
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        required: true
+        type: number
+        description: PR number to merge
+      dry_run:
+        required: false
+        type: boolean
+        default: false
+        description: When true, run all condition checks but skip the actual merge
+      caller:
+        required: false
+        type: string
+        default: unknown
+        description: Identifier of the calling workflow (audit trail only)
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        required: true
+        type: number
+        description: PR number to merge
+      dry_run:
+        required: false
+        type: boolean
+        default: true
+        description: Defaults to true for human dispatch; set false only when explicitly testing real merges
+      caller:
+        required: false
+        type: string
+        default: workflow_dispatch
+        description: Identifier of the dispatching context (audit trail only — the "Force dry-run for non-drain workflow_dispatch" step still gates real merges to workflow_call only)
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  verify-and-merge:
+    name: Verify 7 conditions and merge
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      # checks: read + actions: read are required to read the
+      # statusCheckRollup GraphQL field. Without them, condition 4
+      # (all CI checks SUCCESS) fails at the fetch step with
+      # "Resource not accessible by integration".
+      checks: read
+      actions: read
+      # issues: read is required to populate the closingIssuesReferences
+      # GraphQL field used by conditions 1+2 (linked-issue safety label
+      # check). Without it, the field comes back empty regardless of
+      # whether the PR body has a valid "Closes #N", causing the gate
+      # to falsely report "PR has no closing-issue reference".
+      issues: read
+    env:
+      PR: ${{ inputs.pr_number }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      CALLER: ${{ inputs.caller || 'workflow_dispatch' }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # IGNORED_CHECKS lists status-check names that condition 4 should
+      # treat as informational (NOT required for merge). Empty list means
+      # strict-mode (every rollup check must SUCCESS/NEUTRAL/SKIPPED) —
+      # the v1 behavior. Add a check name here when it's genuinely
+      # informational AND its flakiness or infra-dependency would block
+      # legitimate ready-to-merge PRs.
+      #
+      # The framework ships with an empty list. Downstream forks add
+      # entries based on their own observed flakiness — e.g. a Render-
+      # deployed fork might add "Deploy to Render Preview" if their
+      # Render integration is empirically unreliable. See
+      # docs/agent-merge-gate.md § "Informational checks" for the
+      # 3-criteria bar for adding entries.
+      IGNORED_CHECKS: '[]'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Audit trail
+        run: |
+          echo "=== Agent Merge Gate invocation ==="
+          echo "PR: #${PR}"
+          echo "Trigger: ${{ github.event_name }}"
+          echo "Caller: ${CALLER}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Dry run: ${DRY_RUN}"
+          echo "Run ID: ${{ github.run_id }}"
+
+      - name: Force dry-run for non-drain workflow_dispatch
+        # workflow_dispatch is only allowed for testing — real merges
+        # must come from /drain via workflow_call with caller set.
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run != true
+        run: |
+          echo "::error::workflow_dispatch invocations MUST set dry_run=true. Real merges are reserved for workflow_call from /drain (caller=goal-drain)."
+          exit 1
+
+      - name: Fetch PR state
+        id: pr
+        run: |
+          if ! gh pr view "${PR}" --json number,state,baseRefName,labels,statusCheckRollup,closingIssuesReferences,mergeStateStatus,reviews > /tmp/pr.json 2>/tmp/pr.err; then
+            echo "::error::Cannot read PR #${PR}: $(cat /tmp/pr.err)"
+            exit 1
+          fi
+          cat /tmp/pr.json | jq '{number, state, baseRefName, mergeStateStatus}'
+
+      - name: Condition 5 — PR is open and base is main
+        run: |
+          STATE=$(jq -r '.state' /tmp/pr.json)
+          BASE=$(jq -r '.baseRefName' /tmp/pr.json)
+          if [ "$STATE" != "OPEN" ]; then
+            echo "::error::PR #${PR} is not open (state=$STATE)"
+            exit 1
+          fi
+          if [ "$BASE" != "main" ]; then
+            echo "::error::PR #${PR} base is '$BASE', expected 'main'"
+            exit 1
+          fi
+          echo "OK: open, base=main"
+
+      - name: Condition 7 — no do-not-merge label on the PR
+        run: |
+          if jq -e '.labels[] | select(.name == "do-not-merge")' /tmp/pr.json > /dev/null; then
+            echo "::error::PR #${PR} has the do-not-merge label"
+            exit 1
+          fi
+          echo "OK: no do-not-merge label"
+
+      - name: Conditions 1+2 — linked issue has exactly one safety label, not :hot
+        run: |
+          ISSUE=$(jq -r '.closingIssuesReferences[0].number // empty' /tmp/pr.json)
+          if [ -z "$ISSUE" ]; then
+            echo "::error::PR #${PR} has no closing-issue reference (need a 'Closes #N' in the body)"
+            exit 1
+          fi
+          echo "Linked issue: #${ISSUE}"
+          LABELS=$(gh issue view "$ISSUE" --json labels --jq '[.labels[].name | select(startswith("safety:"))]')
+          COUNT=$(echo "$LABELS" | jq 'length')
+          if [ "$COUNT" -ne 1 ]; then
+            echo "::error::Issue #${ISSUE} has ${COUNT} safety:* labels (expected exactly 1). Labels: $LABELS"
+            exit 1
+          fi
+          CLASS=$(echo "$LABELS" | jq -r '.[0]')
+          if [ "$CLASS" = "safety:hot" ]; then
+            echo "::error::Issue #${ISSUE} is classified safety:hot — drain refuses to merge"
+            exit 1
+          fi
+          echo "OK: safety class = $CLASS"
+
+      - name: Condition 3 — APPROVED review from va-reviewer
+        run: |
+          # va-reviewer is the framework's reviewer bot account (CLAUDE.md §Agent Configuration).
+          # Forks using a different reviewer bot name update this step accordingly.
+          # Take the latest review per author and require va-reviewer's to be APPROVED.
+          LATEST_VA_REVIEWER=$(jq -r '[.reviews[] | select(.author.login == "va-reviewer")] | sort_by(.submittedAt) | last | .state // "NONE"' /tmp/pr.json)
+          if [ "$LATEST_VA_REVIEWER" != "APPROVED" ]; then
+            echo "::error::PR #${PR} latest va-reviewer review state is '$LATEST_VA_REVIEWER' (expected APPROVED)"
+            exit 1
+          fi
+          echo "OK: va-reviewer APPROVED"
+
+      - name: Condition 4 — all required CI checks are SUCCESS
+        # Respect IGNORED_CHECKS (workflow-level env above) so that flaky
+        # informational checks don't block legitimate ready-to-merge PRs.
+        # Informational checks are filtered out BEFORE the SUCCESS-only
+        # assertion — the safety boundary is identical, just narrower in
+        # scope.
+        run: |
+          TOTAL=$(jq -r '[.statusCheckRollup[]] | length' /tmp/pr.json)
+          IGNORED_COUNT=$(jq -r --argjson ignored "${IGNORED_CHECKS}" '[.statusCheckRollup[] | select(.name as $n | $ignored | index($n))] | length' /tmp/pr.json)
+          RELEVANT=$(jq -r --argjson ignored "${IGNORED_CHECKS}" '[.statusCheckRollup[] | select(.name as $n | $ignored | index($n) | not)]' /tmp/pr.json)
+          FAILED=$(echo "$RELEVANT" | jq -r '[.[] | select((.conclusion // "PENDING") != "SUCCESS" and (.conclusion // "PENDING") != "NEUTRAL" and (.conclusion // "PENDING") != "SKIPPED") | .name] | .[]')
+          RELEVANT_COUNT=$(echo "$RELEVANT" | jq 'length')
+          if [ "$IGNORED_COUNT" -gt 0 ]; then
+            IGNORED_NAMES=$(jq -r --argjson ignored "${IGNORED_CHECKS}" '[.statusCheckRollup[] | select(.name as $n | $ignored | index($n)) | "\(.name) (\(.conclusion // "PENDING"))"] | join(", ")' /tmp/pr.json)
+            echo "::notice::Ignored ${IGNORED_COUNT} informational check(s) per IGNORED_CHECKS env: ${IGNORED_NAMES}"
+          fi
+          if [ -n "$FAILED" ]; then
+            echo "::error::PR #${PR} has non-SUCCESS relevant checks (${RELEVANT_COUNT} relevant of ${TOTAL} total):"
+            echo "$FAILED" | sed 's/^/  /'
+            exit 1
+          fi
+          echo "OK: all ${RELEVANT_COUNT} relevant check(s) SUCCESS/NEUTRAL/SKIPPED (${IGNORED_COUNT} informational ignored of ${TOTAL} total)"
+
+      - name: Condition 6 — caller is drain (audit-only, non-blocking)
+        # Architecturally the gate is intended for /drain only.
+        # We can't cryptographically prove the caller from inside the
+        # called workflow, so we record the claimed caller in the audit
+        # log. The 6 other conditions are the real safety enforcement.
+        run: |
+          if [ "${CALLER}" != "goal-drain" ]; then
+            echo "::warning::Caller is '${CALLER}' (expected 'goal-drain'). All other conditions still gate the merge."
+          else
+            echo "OK: caller = goal-drain"
+          fi
+
+      - name: All 7 conditions verified
+        run: |
+          echo "::notice::All conditions passed for PR #${PR}. ${DRY_RUN}"
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "Dry-run mode — skipping the actual merge."
+          fi
+
+      - name: Merge
+        if: inputs.dry_run != true
+        run: |
+          gh pr merge "${PR}" --squash --delete-branch
+          echo "::notice::Merged PR #${PR} (squash) and deleted source branch."

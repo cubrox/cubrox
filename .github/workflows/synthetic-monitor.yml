@@ -17,15 +17,9 @@ name: Synthetic Auth Monitor
 #     default) — that's how the throwaway session is minted.
 
 on:
-  # DISABLED for masterkey rename — restore in #215 (E5-T6). Cron can fire up
-  # to 15 min late; a fire mid-cutover would probe the resolved old-service
-  # URL and false-alert. workflow_dispatch stays enabled for manual diagnostic
-  # fires during the cutover window. TODO(#215): uncomment the schedule block
-  # once the masterkey Phase 4 cutover has landed and the new service is
-  # verified healthy for 24h.
-  # schedule:
-  #   # Hourly at :17 past, to avoid top-of-hour runner congestion.
-  #   - cron: '17 * * * *'
+  schedule:
+    # Hourly at :17 past, to avoid top-of-hour runner congestion.
+    - cron: '17 * * * *'
   workflow_dispatch:
     inputs:
       base_url:

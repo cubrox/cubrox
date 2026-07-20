@@ -27,8 +27,16 @@
 .reading-section {
   white-space: pre-wrap;
   overflow-wrap: break-word;
-  /* READ-P2-1 (#165): user-controlled spacing between passage sections. */
-  margin-bottom: var(--reader-paragraph-spacing, 1em);
+  /* READ-P2-1 (#165): user-controlled spacing between passage sections.
+     Deliberately `padding-bottom`, NOT `margin-bottom`. The next sibling is
+     always a #question-slot, and once a question loads that slot carries
+     `.inline-question { margin: 1.5rem 0 }`. Adjacent-sibling margins collapse
+     to the larger of the two, so a margin here would be swallowed whenever the
+     preference is below 1.5rem — making "Tight" and "Standard" visually inert
+     at the default reader size. Padding never collapses, so every option stays
+     distinguishable. `.reading-section` has no background or border, so this
+     renders identically to a margin otherwise. */
+  padding-bottom: var(--reader-paragraph-spacing, 1em);
 }
 
 /* Inline comprehension question shown after each passage section. */

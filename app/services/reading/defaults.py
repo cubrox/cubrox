@@ -10,6 +10,8 @@ user before they've toggled anything. Per the architecture doc:
   - 33em max width (~65 characters; in `em` not `ch` so the column is the
     same width across computers regardless of the rendered font)
   - bionic emphasis off (opt-in only; ships in READ-3 #17)
+  - `normal` letter- and word-spacing (opt-in widening; READ-P2-1 #165)
+  - 1em paragraph spacing between passage sections (READ-P2-1 #165)
 
 The keys here are the canonical preference keys for the rest of the
 codebase. READ-2 (#16) will validate user input against this same set.
@@ -28,6 +30,14 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
     "fg": "#1a1a1a",
     "max_width": "33em",
     "bionic_enabled": False,
+    # READ-P2-1 (#165): `normal` is the CSS keyword for both, so the default
+    # renders exactly as before this preference existed — spacing is opt-in.
+    "letter_spacing": "normal",
+    "word_spacing": "normal",
+    # 1em ≈ one blank line between sections. Unlike the two above there is no
+    # no-op value in the allow-list; sections previously had no margin-bottom,
+    # so this default does slightly increase inter-section spacing.
+    "paragraph_spacing": "1em",
 }
 
 

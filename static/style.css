@@ -13,6 +13,10 @@
   background: var(--reader-bg);
   color: var(--reader-fg);
   max-width: var(--reader-max-width);
+  /* READ-P2-1 (#165): fall back to `normal` so the surface still renders
+     correctly if the style block is ever served without these variables. */
+  letter-spacing: var(--reader-letter-spacing, normal);
+  word-spacing: var(--reader-word-spacing, normal);
   margin: 2rem auto;
   padding: 2rem;
 }
@@ -23,6 +27,8 @@
 .reading-section {
   white-space: pre-wrap;
   overflow-wrap: break-word;
+  /* READ-P2-1 (#165): user-controlled spacing between passage sections. */
+  margin-bottom: var(--reader-paragraph-spacing, 1em);
 }
 
 /* Inline comprehension question shown after each passage section. */

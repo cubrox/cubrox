@@ -17,6 +17,7 @@ Covers the Definition of Done from issue #16 (READ-2):
 import hashlib
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -455,3 +456,125 @@ def test_bionic_toggle_with_other_users_passage_id_does_not_oob_swap(
     body = response.text
     assert '<style id="reading-surface-style">' in body
     assert 'hx-swap-oob="true"' not in body
+
+
+# ---------------------------------------------------------------------------
+# READ-P2-1 (#165) — letter / word / paragraph spacing preferences
+# ---------------------------------------------------------------------------
+
+# (preference key, CSS variable name, an allow-listed non-default value)
+SPACING_KEYS = [
+    ("letter_spacing", "--reader-letter-spacing", "0.05em"),
+    ("word_spacing", "--reader-word-spacing", "0.2em"),
+    ("paragraph_spacing", "--reader-paragraph-spacing", "1.5em"),
+]
+
+
+def test_read_view_renders_spacing_variables_with_defaults(
+    client: TestClient, session: Session
+) -> None:
+    """A user with no Preference row still gets all three spacing CSS
+    variables, populated from DEFAULT_PREFERENCES."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    body = client.get(f"/read/{passage.id}").text
+
+    assert "--reader-letter-spacing: normal" in body
+    assert "--reader-word-spacing: normal" in body
+    assert "--reader-paragraph-spacing: 1em" in body
+
+
+@pytest.mark.parametrize(("key", "css_var", "value"), SPACING_KEYS)
+def test_post_spacing_preference_returns_updated_fragment(
+    client: TestClient, session: Session, key: str, css_var: str, value: str
+) -> None:
+    """An allow-listed spacing value returns 200 with the updated <style>
+    fragment and persists to the Preference row."""
+    user = signed_in(session)
+    response = client.post(f"/preferences/{key}", data={"value": value})
+
+    assert response.status_code == 200
+    body = response.text
+    assert '<style id="reading-surface-style">' in body
+    assert f"{css_var}: {value}" in body
+
+    pref = session.get(Preference, user.id)
+    assert pref is not None
+    assert pref.values[key] == value
+
+
+@pytest.mark.parametrize(("key", "css_var", "value"), SPACING_KEYS)
+def test_spacing_value_outside_allow_list_returns_422(
+    client: TestClient, session: Session, key: str, css_var: str, value: str
+) -> None:
+    """Values not on the allow-list are rejected before reaching the
+    `| safe` CSS injection point — same invariant as every other key."""
+    signed_in(session)
+    response = client.post(f"/preferences/{key}", data={"value": "99em"})
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(("key", "css_var", "value"), SPACING_KEYS)
+def test_spacing_css_injection_attempt_returns_422(
+    client: TestClient, session: Session, key: str, css_var: str, value: str
+) -> None:
+    """The allow-list is what stops CSS injection through the new keys."""
+    signed_in(session)
+    response = client.post(
+        f"/preferences/{key}",
+        data={"value": "normal;}body{display:none}"},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(("key", "css_var", "value"), SPACING_KEYS)
+def test_spacing_preference_persists_across_requests(
+    client: TestClient, session: Session, key: str, css_var: str, value: str
+) -> None:
+    """A toggled spacing value is still rendered on a later page load —
+    the DoD's 'persists across requests' assertion."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    client.post(f"/preferences/{key}", data={"value": value})
+    body = client.get(f"/read/{passage.id}").text
+
+    assert f"{css_var}: {value}" in body
+
+
+def test_spacing_toggle_leaves_other_spacing_keys_untouched(
+    client: TestClient, session: Session
+) -> None:
+    """Setting one spacing key merges into the blob rather than replacing
+    it — the other two keep their defaults."""
+    user = signed_in(session)
+
+    body = client.post("/preferences/letter_spacing", data={"value": "0.08em"}).text
+
+    assert "--reader-letter-spacing: 0.08em" in body
+    assert "--reader-word-spacing: normal" in body
+    assert "--reader-paragraph-spacing: 1em" in body
+
+    pref = session.get(Preference, user.id)
+    assert pref is not None
+    assert pref.values == {"letter_spacing": "0.08em"}
+
+
+def test_sidebar_renders_spacing_controls(client: TestClient, session: Session) -> None:
+    """The sidebar is generated from PREFERENCE_OPTIONS, so the three new
+    keys get their own fieldset and buttons with no template change."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    body = client.get(f"/read/{passage.id}").text
+
+    assert 'hx-post="/preferences/letter_spacing"' in body
+    assert 'hx-post="/preferences/word_spacing"' in body
+    assert 'hx-post="/preferences/paragraph_spacing"' in body
+
+    # Friendly labels, not raw CSS values, for the button text.
+    assert "Widest" in body
+    assert "Loosest" in body

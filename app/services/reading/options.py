@@ -37,6 +37,19 @@ PREFERENCE_OPTIONS: dict[str, list[Any]] = {
     # measures.
     "max_width": ["28em", "33em", "38em", "43em"],
     "bionic_enabled": [True, False],
+    # READ-P2-1 (#165): spacing controls. Typography research on dyslexia and
+    # visual crowding finds wider letter/word spacing improves reading fluency.
+    # In `em` for the same reason as max_width above — `em` tracks --reader-size
+    # (a fixed px), so spacing scales with the size preference and renders
+    # identically across machines, whereas `ch` varies with the fallback font.
+    # `normal` is the CSS keyword, so the default is a true no-op.
+    "letter_spacing": ["normal", "0.03em", "0.05em", "0.08em"],
+    "word_spacing": ["normal", "0.1em", "0.2em", "0.3em"],
+    # Applied as margin-bottom on `.reading-section`. Note this spaces the
+    # *sections* a passage is split into, not paragraphs within a section —
+    # section text is `white-space: pre-wrap`, so intra-section paragraph breaks
+    # are literal newlines in the source text with no element to target.
+    "paragraph_spacing": ["0.5em", "1em", "1.5em", "2em"],
 }
 
 # Friendly labels for sidebar UI section headings (the <legend> per
@@ -65,6 +78,18 @@ PREFERENCE_LABELS: dict[tuple[str, Any], str] = {
     ("max_width", "33em"): "Standard",
     ("max_width", "38em"): "Wide",
     ("max_width", "43em"): "Extra wide",
+    ("letter_spacing", "normal"): "Normal",
+    ("letter_spacing", "0.03em"): "Slight",
+    ("letter_spacing", "0.05em"): "Wide",
+    ("letter_spacing", "0.08em"): "Widest",
+    ("word_spacing", "normal"): "Normal",
+    ("word_spacing", "0.1em"): "Slight",
+    ("word_spacing", "0.2em"): "Wide",
+    ("word_spacing", "0.3em"): "Widest",
+    ("paragraph_spacing", "0.5em"): "Tight",
+    ("paragraph_spacing", "1em"): "Standard",
+    ("paragraph_spacing", "1.5em"): "Loose",
+    ("paragraph_spacing", "2em"): "Loosest",
 }
 
 

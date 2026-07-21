@@ -27,6 +27,7 @@ Indexes:
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 import sqlalchemy as sa
 from sqlmodel import Field, SQLModel
@@ -54,3 +55,13 @@ class ReadingEvent(SQLModel, table=True):
     # `ReadingEvent(...)` without `occurred_at` works whether or not the
     # writer relies on the DB's clock.
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC), nullable=False)
+    # ANALYTICS-1 (#166): the user's raw stored preference values at the moment
+    # this event was recorded, so mode-correlation analysis reflects what the
+    # reader actually had set during the session (the `preference` table only
+    # holds their *current* settings). JSONB on Postgres, JSON on SQLite — same
+    # column type as Preference.values. Nullable: null means the user had no
+    # preference row (i.e. all defaults), which is not an error. Append-only,
+    # like the rest of this row — never updated after insert.
+    preferences_snapshot: dict[str, Any] | None = Field(
+        default=None, sa_column=sa.Column(sa.JSON, nullable=True)
+    )

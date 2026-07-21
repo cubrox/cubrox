@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.models.passage import Passage
+from app.models.preference import Preference
 from app.models.reading_event import ReadingEvent
 from tests.conftest import make_user, signed_in
 
@@ -235,3 +236,91 @@ def test_reading_view_template_contains_line_count_script(
     # The script reads computed line-height — pin the property reference
     # so a refactor that drops it surfaces here, not in production.
     assert "lineHeight" in body
+
+
+# ---------------------------------------------------------------------------
+# ANALYTICS-1 (#166) — preferences snapshot on the reading event
+# ---------------------------------------------------------------------------
+
+
+def _set_preference(session: Session, owner_id: uuid.UUID, values: dict) -> None:
+    """Create the user's Preference row directly, mirroring what the
+    POST /preferences/{key} route would persist."""
+    session.add(Preference(owner_id=owner_id, values=values))
+    session.commit()
+
+
+def test_close_snapshots_current_preferences(client: TestClient, session: Session) -> None:
+    """The reading_event row captures the user's stored preference values
+    at close time (DoD: snapshot matches preference.values)."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+    prefs = {"size": "24px", "bionic_enabled": True, "letter_spacing": "0.05em"}
+    _set_preference(session, user.id, prefs)
+
+    response = client.post(f"/passages/{passage.id}/close", data={"lines": 10})
+    assert response.status_code == 204
+
+    row = session.exec(select(ReadingEvent)).one()
+    assert row.preferences_snapshot == prefs
+
+
+def test_close_snapshot_is_null_when_no_preference_row(
+    client: TestClient, session: Session
+) -> None:
+    """A user who never toggled a preference has no Preference row; the
+    snapshot is null (all defaults), NOT a 500 (DoD + guardrail)."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    response = client.post(f"/passages/{passage.id}/close", data={"lines": 7})
+    assert response.status_code == 204
+
+    row = session.exec(select(ReadingEvent)).one()
+    assert row.preferences_snapshot is None
+
+
+def test_close_snapshot_is_point_in_time_not_a_live_reference(
+    client: TestClient, session: Session
+) -> None:
+    """The snapshot records what the user had AT close time. A later
+    preference change must not retroactively alter the stored event —
+    the whole point of snapshotting rather than joining live."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+    _set_preference(session, user.id, {"size": "16px"})
+
+    client.post(f"/passages/{passage.id}/close", data={"lines": 5})
+
+    # User changes a preference after the event was recorded.
+    pref = session.get(Preference, user.id)
+    assert pref is not None
+    pref.values = {"size": "28px"}
+    session.add(pref)
+    session.commit()
+
+    row = session.exec(select(ReadingEvent)).one()
+    assert row.preferences_snapshot == {"size": "16px"}
+
+
+def test_close_snapshot_not_echoed_in_response_body(client: TestClient, session: Session) -> None:
+    """Guardrail: preferences_snapshot is user data and must never appear
+    in the HTTP response. The 204 carries no body regardless."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+    _set_preference(session, user.id, {"size": "24px", "bionic_enabled": True})
+
+    response = client.post(f"/passages/{passage.id}/close", data={"lines": 9})
+    assert response.text == ""
+
+
+def test_close_rejected_lines_writes_no_snapshot_row(client: TestClient, session: Session) -> None:
+    """An out-of-range line count still inserts NO row (existing
+    behaviour), so there's no snapshot to capture either."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+    _set_preference(session, user.id, {"size": "24px"})
+
+    response = client.post(f"/passages/{passage.id}/close", data={"lines": 0})
+    assert response.status_code == 204
+    assert session.exec(select(ReadingEvent)).all() == []

@@ -340,11 +340,18 @@ def passage_close(
         )
         return Response(status_code=204)
 
+    # ANALYTICS-1 (#166): snapshot the user's raw stored preferences so
+    # mode-correlation analysis reflects what they actually had set during the
+    # session, not their current settings. No preference row -> null snapshot
+    # (all defaults), which is not an error. Stored server-side only; never
+    # echoed in the response (this route returns 204 with no body) or logged.
+    stored_pref = session.get(Preference, user.id)
     session.add(
         ReadingEvent(
             owner_id=user.id,
             passage_id=passage_id,
             lines_processed=lines,
+            preferences_snapshot=stored_pref.values if stored_pref else None,
         )
     )
     session.commit()

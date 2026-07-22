@@ -28,6 +28,7 @@ Supabase `gotrue.types.User`: it has `.id` (UUID) and `.email` (str).
 That's all the routes touch.
 """
 
+import os
 import uuid
 from collections.abc import Generator
 from types import SimpleNamespace
@@ -38,10 +39,23 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
-from app.db import get_session
-from app.integrations.supabase import client as supabase_client_module
-from app.integrations.supabase.auth import current_user, try_current_user
-from app.main import app
+# OBS-1 (#167): guarantee the test session never initialises Sentry.
+#
+# `app/main.py` calls `sentry_sdk.init()` at import time when SENTRY_DSN is
+# set. `from app.main import app` below runs at COLLECTION time, so on a
+# machine with a real SENTRY_DSN exported (or present in `.env` — Settings
+# sets `env_file=".env"`) the whole test run would execute against a LIVE
+# Sentry client, shipping test failures to the real project as fake
+# production errors. Blanking the var here, before that import, is what
+# enforces the ticket's "no sentry_sdk.init() in test runs" guardrail.
+#
+# MUST stay above the `app.*` imports — moving it below re-opens the hole.
+os.environ["SENTRY_DSN"] = ""
+
+from app.db import get_session  # noqa: E402
+from app.integrations.supabase import client as supabase_client_module  # noqa: E402
+from app.integrations.supabase.auth import current_user, try_current_user  # noqa: E402
+from app.main import app  # noqa: E402
 
 
 @pytest.fixture

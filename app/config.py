@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     # local dev override to False via env.
     session_cookie_secure: bool = True
 
+    # OBS-1 (#167): Sentry error tracking, deferred to Phase 2 by ADR-004.
+    # Optional by design — when unset (local dev, CI, tests) app/main.py
+    # skips `sentry_sdk.init()` entirely and the app behaves exactly as
+    # before. Populated in production/preview from the Secret Manager
+    # `sentry-dsn` secret, mapped as a Cloud Run env var.
+    sentry_dsn: str = ""
+
     # Supabase (SUPA-1/2/3). Required in non-dev environments so the
     # auth flow + future RLS-aware queries work. Empty defaults so the
     # test suite can run without env setup (the legacy auth path

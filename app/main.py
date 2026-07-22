@@ -9,12 +9,39 @@ Production (Cloud Run) runs the same command — see Dockerfile.
 import os
 from pathlib import Path
 
+import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 from app.api import auth, health, home, passages, reading, todos
+from app.config import get_settings
 from app.integrations.supabase.auth import UnauthenticatedError
+
+# OBS-1 (#167): initialise Sentry before the app is constructed so the
+# Starlette/FastAPI integrations wrap the whole middleware stack.
+#
+# Gated on SENTRY_DSN being set: unset (local dev, CI, tests) means no
+# init at all and the app behaves exactly as it did before this ticket —
+# no network calls, no middleware, no behavioural difference. That is why
+# the guard is on the DSN rather than on `environment`.
+#
+# Error capture only. `traces_sample_rate` is deliberately NOT set —
+# performance tracing is a separate tuning (and cost) decision, and
+# leaving it unset keeps the SDK's tracing off by default.
+#
+# No route/service/model file imports sentry_sdk: the integrations
+# capture unhandled exceptions automatically via middleware, so manual
+# instrumentation would be redundant.
+_settings = get_settings()
+if _settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=_settings.sentry_dsn,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        environment=_settings.environment,
+    )
 
 app = FastAPI(title="Master Key")
 

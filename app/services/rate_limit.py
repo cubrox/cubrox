@@ -191,32 +191,22 @@ def _enforce(
 SessionDep = Annotated[Session, Depends(get_session)]
 
 
-async def enforce_login_rate_limit(
-    request: Request,
-    session: SessionDep,
-) -> None:
-    """FastAPI dependency for POST /login.
+def check_login_rate_limit(request: Request, session: Session, email: str) -> None:
+    """Enforce the /login rate limit for a (client IP, email) pair.
 
-    Extracts the IP and the form-submitted `email` field. Both buckets
-    must have ≥1 token; otherwise the request is rejected with 429.
+    Called directly from the `login` handler — not as a dependency — so the
+    handler can catch the 429 and render it as an HTML form fragment instead
+    of a raw JSON body (#288). Both the IP bucket and the email bucket must
+    have ≥1 token; otherwise raises HTTPException(429) with `Retry-After`.
+
+    `email` is the already-normalised address the handler validated, so the
+    bucket key is stable across requests for the same user.
     """
-    ip = _client_ip(request)
-    # Read the email out of the form body. FastAPI's form parsing has
-    # already cached the body by the time this dependency runs, so the
-    # downstream route reading `email: Form()` doesn't re-read.
-    form = await request.form()
-    raw_email = form.get("email")
-    if not isinstance(raw_email, str) or not raw_email:
-        # No email supplied — the route's own Form validation will 422
-        # this. Don't burn a token on malformed input.
-        return
-    email_norm = raw_email.strip().lower()
-
     _enforce(
         session,
-        keys=(f"login:ip:{ip}", f"login:email:{email_norm}"),
+        keys=(f"login:ip:{_client_ip(request)}", f"login:email:{email}"),
         route="login",
-        email_hash=_hash_email(email_norm),
+        email_hash=_hash_email(email),
     )
 
 

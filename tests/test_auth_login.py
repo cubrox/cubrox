@@ -164,7 +164,13 @@ def test_supabase_non_rate_limit_authapierror_returns_502(
     )
     response = client.post("/login", data={"email": "reader@example.com"})
     assert response.status_code == 502
-    assert response.json()["detail"] == "Sign-in unavailable"
+    # #288: 502 now renders an HTML form fragment (not a JSON HTTPException) so
+    # HTMX can swap a readable message in via hx-target-5*. The generic message
+    # preserves the enumeration guard — Supabase's error text is never echoed.
+    body = response.text
+    assert '<form id="signin-form"' in body
+    assert "temporarily unavailable" in body
+    assert "invalid grant" not in body
 
 
 def test_supabase_upstream_error_returns_502(client: TestClient, supabase_mock: MagicMock) -> None:
@@ -173,3 +179,57 @@ def test_supabase_upstream_error_returns_502(client: TestClient, supabase_mock: 
     supabase_mock.auth.sign_in_with_otp.side_effect = RuntimeError("supabase down")
     response = client.post("/login", data={"email": "reader@example.com"})
     assert response.status_code == 502
+
+
+# ---------------------------------------------------------------------------
+# #288 — every /login error path renders a readable form fragment, not JSON
+# ---------------------------------------------------------------------------
+
+
+def test_malformed_email_renders_form_fragment_not_json(client: TestClient) -> None:
+    """422 body is an HTML form fragment with a readable message, not a raw
+    JSON HTTPException that HTMX would dump into #signin-form verbatim."""
+    response = client.post("/login", data={"email": "not-an-email"})
+
+    assert response.status_code == 422
+    body = response.text
+    assert '<form id="signin-form"' in body
+    assert 'role="alert"' in body
+    assert "valid email address" in body
+    assert '{"detail"' not in body
+
+
+def test_error_fragments_carry_both_4xx_and_5xx_targets(client: TestClient) -> None:
+    """The re-rendered form must declare hx-target-5* as well as hx-target-4*,
+    so a follow-up 5xx (502) also swaps back in rather than vanishing — the
+    root cause of the '502 shows nothing' symptom."""
+    body = client.post("/login", data={"email": "not-an-email"}).text
+
+    assert 'hx-target-4*="#signin-form"' in body
+    assert 'hx-target-5*="#signin-form"' in body
+
+
+def test_local_rate_limit_renders_fragment_with_retry_after(client: TestClient) -> None:
+    """Exhaust the local 10/hour bucket from one IP, then confirm the 429 is a
+    readable fragment (not JSON) that keeps Retry-After and does not echo the
+    email (leak guard)."""
+    ip = "203.0.113.55"
+    email = "loop@example.com"
+    last = None
+    for _ in range(11):
+        last = client.post(
+            "/login",
+            data={"email": email},
+            headers={"X-Forwarded-For": ip},
+        )
+
+    assert last is not None
+    assert last.status_code == 429
+    body = last.text
+    assert '<form id="signin-form"' in body
+    assert 'role="alert"' in body
+    assert "wait a few minutes" in body
+    assert '{"detail"' not in body
+    assert "Retry-After" in last.headers
+    # Enumeration / leak guard: the rate-limited email must not appear.
+    assert email not in body

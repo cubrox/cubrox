@@ -29,40 +29,57 @@ from typing import Annotated
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlmodel import Session
 from supabase_auth.errors import AuthApiError
 
 from app.config import Settings, get_settings
+from app.db import get_session
 from app.integrations.supabase.auth import SUPABASE_COOKIE_NAME, current_user
 from app.integrations.supabase.client import anon_client
-from app.services.rate_limit import enforce_login_rate_limit
+from app.services.rate_limit import check_login_rate_limit
 
 router = APIRouter()
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+SessionDep = Annotated[Session, Depends(get_session)]
 CurrentUser = Annotated[object, Depends(current_user)]  # User; loose typing for transition
 
 GENERIC_FRAGMENT = "<p>Check your inbox for a sign-in link.</p>"
 
-# Rate-limit fragment: re-renders the sign-in form (so the user can retry with
-# the same or a different address) plus an inline error message HTMX's
-# response-targets ext (#250) swaps into #signin-form on a 429. Kept minimal
-# and self-contained — no template round-trip so the /login handler stays
-# entirely synchronous. Matches the visual shape of the form in
-# templates/home.html so the swap doesn't feel jarring.
-RATE_LIMIT_FRAGMENT = (
-    '<form id="signin-form" hx-post="/login" hx-target="#signin-form"'
-    ' hx-swap="outerHTML" hx-ext="response-targets" hx-target-4*="#signin-form">'
-    '<p role="alert" class="error">Too many sign-in emails just now.'
-    " Please try again in a few minutes.</p>"
-    '<label for="email">Email'
-    '<input type="email" id="email" name="email" required autofocus'
-    ' autocomplete="email" placeholder="you@example.com">'
-    "<small>We'll email you a one-time sign-in link."
-    " No password to remember.</small>"
-    "</label>"
-    '<button type="submit">Send me a sign-in link</button>'
-    "</form>"
-)
+
+def signin_form_fragment(error_message: str | None = None) -> str:
+    """Re-render the sign-in form, optionally with an inline error message.
+
+    Every non-success `/login` outcome (bad email, rate limit, upstream
+    failure) returns this so HTMX's response-targets ext swaps a readable
+    form-plus-message into #signin-form — never a raw JSON `{"detail": …}`
+    body or, for a 5xx with no target, nothing at all (#288).
+
+    Self-contained (no template round-trip) so the /login handler stays
+    synchronous, and structurally identical to the form in
+    templates/home.html — including BOTH `hx-target-4*` and `hx-target-5*`
+    so a subsequent 4xx OR 5xx also swaps back in rather than leaking JSON.
+
+    The message must never echo the submitted email (enumeration + the
+    "don't leak the rate-limited email" guard) — callers pass fixed strings,
+    and the email input is re-rendered empty.
+    """
+    alert = f'<p role="alert" class="error">{error_message}</p>' if error_message else ""
+    return (
+        '<form id="signin-form" hx-post="/login" hx-target="#signin-form"'
+        ' hx-swap="outerHTML" hx-ext="response-targets"'
+        ' hx-target-4*="#signin-form" hx-target-5*="#signin-form">'
+        f"{alert}"
+        '<label for="email">Email'
+        '<input type="email" id="email" name="email" required autofocus'
+        ' autocomplete="email" placeholder="you@example.com">'
+        "<small>We'll email you a one-time sign-in link."
+        " No password to remember.</small>"
+        "</label>"
+        '<button type="submit">Send me a sign-in link</button>'
+        "</form>"
+    )
+
 
 # AuthApiError codes that indicate a Supabase rate limit — map to 429 not 502.
 # The substring fallback that preceded this (#252, was in #247's PR #249) risked
@@ -103,11 +120,11 @@ def _external_origin(request: Request, fallback: str) -> str:
     "/login",
     response_class=HTMLResponse,
     status_code=202,
-    dependencies=[Depends(enforce_login_rate_limit)],
 )
 def login(
     request: Request,
     settings: SettingsDep,
+    session: SessionDep,
     email: Annotated[str, Form()],
 ) -> Response:
     """Issue a Supabase magic-link to the supplied email.
@@ -127,12 +144,37 @@ def login(
       - 502 for anything else (network, config bug, non-rate-limit
         Supabase error). Enumeration guard: generic message.
     """
+    # Every failure below returns an HTML form fragment (never a JSON
+    # HTTPException) so the response-targets ext swaps a readable message into
+    # #signin-form, at the right status code. See signin_form_fragment / #288.
     try:
         result = validate_email(email, check_deliverability=False)
-    except EmailNotValidError as exc:
-        raise HTTPException(status_code=422, detail="Invalid email format") from exc
+    except EmailNotValidError:
+        return HTMLResponse(
+            content=signin_form_fragment("Please enter a valid email address."),
+            status_code=422,
+        )
 
     normalized_email = result.normalized.lower()
+
+    # Local token-bucket limit (10/hour per IP and per email). Called directly
+    # rather than as a dependency so the 429 renders as a fragment; the check
+    # runs AFTER email validation so a malformed address doesn't burn a token.
+    try:
+        check_login_rate_limit(request, session, normalized_email)
+    except HTTPException as exc:
+        if exc.status_code != 429:
+            raise
+        headers = {"Retry-After": exc.headers["Retry-After"]} if exc.headers else {}
+        # Fixed message — never echo the rate-limited email (leak guard).
+        return HTMLResponse(
+            content=signin_form_fragment(
+                "Too many sign-in attempts. Please wait a few minutes and try again."
+            ),
+            status_code=429,
+            headers=headers,
+        )
+
     origin = _external_origin(request, settings.app_url)
     redirect_url = f"{origin}/auth/callback"
 
@@ -151,9 +193,6 @@ def login(
         # guard: we don't echo Supabase's message verbatim for non-rate-
         # limit errors (which can leak whether an email is known).
         if exc.code in RATE_LIMIT_CODES:
-            # Return HTML fragment (not JSON HTTPException) so HTMX's
-            # response-targets ext (#250) can swap it into #signin-form
-            # for the real user to see instead of a silent 4xx.
             # Supabase's shared-SMTP-pool default is 30 emails per project
             # per hour. AuthApiError does not surface Supabase's actual
             # Retry-After (checked upstream: only message/status/code).
@@ -164,15 +203,27 @@ def login(
             # when the user has a different email in mind. #246 (custom
             # SMTP via Resend) is the structural fix.
             return HTMLResponse(
-                content=RATE_LIMIT_FRAGMENT,
+                content=signin_form_fragment(
+                    "Too many sign-in emails just now. Please try again in a few minutes."
+                ),
                 status_code=429,
                 headers={"Retry-After": "900"},
             )
-        raise HTTPException(status_code=502, detail="Sign-in unavailable") from exc
-    except Exception as exc:
+        return HTMLResponse(
+            content=signin_form_fragment(
+                "Sign-in is temporarily unavailable. Please try again in a moment."
+            ),
+            status_code=502,
+        )
+    except Exception:
         # Non-Supabase failure (network, config, code bug). Same 502 as
         # before so operators can spot the class from Cloud Logging.
-        raise HTTPException(status_code=502, detail="Sign-in unavailable") from exc
+        return HTMLResponse(
+            content=signin_form_fragment(
+                "Sign-in is temporarily unavailable. Please try again in a moment."
+            ),
+            status_code=502,
+        )
 
     return HTMLResponse(content=GENERIC_FRAGMENT, status_code=202)
 

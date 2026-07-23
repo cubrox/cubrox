@@ -78,7 +78,7 @@ router = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
-Variant = Literal["default", "high-contrast", "large-text", "bionic"]
+Variant = Literal["default", "high-contrast", "large-text", "bionic", "focus-mode"]
 
 # Representative passage with multiple paragraphs so axe-core has a
 # real surface to analyze — headings, paragraph spacing, line wrap,
@@ -126,6 +126,9 @@ _PREFS_FOR_VARIANT: dict[str, dict[str, Any]] = {
     "high-contrast": {"bg": "#1a1a1a", "fg": "#e8e8e8"},
     "large-text": {"size": "28px"},
     "bionic": {"bionic_enabled": True},
+    # READ-P2-2 (#168): dimmed sections are the a11y-relevant part of
+    # focus mode — this variant lets axe scan the surface with dimming on.
+    "focus-mode": {"focus_mode_enabled": True},
 }
 
 

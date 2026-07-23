@@ -16,6 +16,7 @@ Covers the Definition of Done from issue #16 (READ-2):
 
 import hashlib
 import uuid
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -578,3 +579,112 @@ def test_sidebar_renders_spacing_controls(client: TestClient, session: Session) 
     # Friendly labels, not raw CSS values, for the button text.
     assert "Widest" in body
     assert "Loosest" in body
+
+
+# ---------------------------------------------------------------------------
+# READ-P2-2 (#168) — focus mode
+# ---------------------------------------------------------------------------
+
+
+def test_focus_mode_defaults_to_off(client: TestClient, session: Session) -> None:
+    """Opt-in, like bionic. A user with no Preference row gets the
+    no-dimming opacity, so the passage renders exactly as before."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    body = client.get(f"/read/{passage.id}").text
+
+    assert "--reader-section-opacity: 1" in body
+
+
+def test_focus_mode_on_emits_dimmed_opacity(client: TestClient, session: Session) -> None:
+    """Enabling focus mode is observable in page source as the dimmed
+    section opacity (the DoD's 'verifiable in page source')."""
+    signed_in(session)
+
+    body = client.post("/preferences/focus_mode_enabled", data={"value": "true"}).text
+
+    assert '<style id="reading-surface-style">' in body
+    assert "--reader-section-opacity: 0.7" in body
+
+
+def test_focus_mode_accepts_true_and_false_strings(client: TestClient, session: Session) -> None:
+    """The new boolean must coerce like bionic_enabled — without being
+    added to BOOLEAN_KEYS it would fail the allow-list check with 422."""
+    user = signed_in(session)
+
+    assert client.post("/preferences/focus_mode_enabled", data={"value": "true"}).status_code == 200
+    pref = session.get(Preference, user.id)
+    assert pref is not None and pref.values["focus_mode_enabled"] is True
+
+    assert (
+        client.post("/preferences/focus_mode_enabled", data={"value": "false"}).status_code == 200
+    )
+    session.refresh(pref)
+    assert pref.values["focus_mode_enabled"] is False
+
+
+def test_focus_mode_rejects_non_boolean_strings(client: TestClient, session: Session) -> None:
+    signed_in(session)
+    response = client.post("/preferences/focus_mode_enabled", data={"value": "invalid"})
+    assert response.status_code == 422
+
+
+def test_focus_mode_persists_across_requests(client: TestClient, session: Session) -> None:
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    client.post("/preferences/focus_mode_enabled", data={"value": "true"})
+    body = client.get(f"/read/{passage.id}").text
+
+    assert "--reader-section-opacity: 0.7" in body
+
+
+def test_focus_mode_renders_sidebar_toggle(client: TestClient, session: Session) -> None:
+    """Generated from PREFERENCE_OPTIONS, so the toggle appears with no
+    template change — and posts lowercase booleans the route accepts."""
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    body = client.get(f"/read/{passage.id}").text
+
+    assert 'hx-post="/preferences/focus_mode_enabled"' in body
+    assert '"value": "true"' in body and '"value": "false"' in body
+
+
+def test_focus_mode_dimming_is_gated_on_js_applied_class(
+    client: TestClient, session: Session
+) -> None:
+    """Graceful degradation (ticket guardrail): the CSS dims only under
+    `.focus-ready`, which the inline script adds. Without JS nothing is
+    dimmed. Pin both halves so a refactor can't drop the gate and leave
+    JS-less readers with the whole passage at 0.4.
+    """
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+    client.post("/preferences/focus_mode_enabled", data={"value": "true"})
+
+    body = client.get(f"/read/{passage.id}").text
+    css = (Path(__file__).parent.parent / "static" / "style.css").read_text(encoding="utf-8")
+
+    # The stylesheet only dims within .focus-ready.
+    assert "#reading-surface.focus-ready .reading-section" in css
+    # The page never server-renders the class — JS is the only source.
+    assert "focus-ready" not in body.split("<script>")[0]
+    assert 'classList.add("focus-ready")' in body
+
+
+def test_focus_mode_uses_intersection_observer_not_scroll_handler(
+    client: TestClient, session: Session
+) -> None:
+    """Guardrail intent was 'no scroll jank'. IntersectionObserver fires
+    only on band crossings, so there is no per-frame scroll work at all —
+    pin that we didn't regress to a raw scroll listener.
+    """
+    user = signed_in(session)
+    passage = _make_passage(session, user.id)
+
+    body = client.get(f"/read/{passage.id}").text
+
+    assert "IntersectionObserver" in body
+    assert 'addEventListener("scroll"' not in body

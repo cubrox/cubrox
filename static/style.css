@@ -39,6 +39,57 @@
   padding-bottom: var(--reader-paragraph-spacing, 1em);
 }
 
+/* READ-P2-2 (#168): focus mode — dim every passage section except the one
+   centered in the viewport, so the reader's eye isn't competing with the rest
+   of the passage.
+
+   Gated on `.focus-ready`, which the inline script in reading.html adds only
+   once the IntersectionObserver is wired up. Without JavaScript the class is
+   never added, so no section is ever dimmed and the passage reads normally —
+   that's the graceful-degradation requirement. (Dimming via CSS alone would
+   leave a JS-less reader with the WHOLE passage at 0.4 and nothing
+   highlighted.)
+
+   The opacity value comes from --reader-section-opacity, set server-side in
+   reader_style.html: 0.4 when focus mode is on, 1 when off. Because that
+   variable lives in the swapped <style> block, toggling the preference takes
+   effect immediately with no page reload.
+
+   WHY 0.7 AND NOT 0.4 (#168). The ticket specified 0.4 and asserted it
+   "preserves WCAG AA contrast". It does not — dimmed body text at 0.4 measures:
+
+     light bg / dark text    17.40:1 full -> 2.51:1 dimmed
+     sepia bg / sepia text   11.24:1 full -> 2.22:1 dimmed
+     dark bg / light text    14.20:1 full -> 3.33:1 dimmed
+
+   all far below the 4.5:1 AA threshold. axe independently confirmed this in CI
+   (2.52:1, effective foreground #a3a3a3) and failed the a11y gate as a
+   `serious` wcag143 violation, so the ticket's own "zero new axe violations"
+   requirement contradicted its 0.4 value.
+
+   0.7 is the smallest round value clearing AA on every supported theme:
+
+     light 6.41:1   sepia 4.78:1   dark 7.51:1
+
+   (sepia is the binding constraint — it needs 0.68.) The trade-off is that
+   dimming is gentler than the ticket imagined. If real readers find the cue too
+   subtle, strengthen the ACTIVE section instead of dimming the rest further —
+   anything that pushes non-active text below 4.5:1 re-breaks the gate. */
+#reading-surface.focus-ready .reading-section {
+  opacity: var(--reader-section-opacity, 1);
+  transition: opacity 0.2s ease;
+}
+
+#reading-surface.focus-ready .reading-section.focus-active {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #reading-surface.focus-ready .reading-section {
+    transition: none;
+  }
+}
+
 /* Inline comprehension question shown after each passage section. */
 .inline-question {
   border-left: 3px solid var(--pico-primary);

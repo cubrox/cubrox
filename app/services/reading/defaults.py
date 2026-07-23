@@ -34,6 +34,8 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
     # renders exactly as before this preference existed — spacing is opt-in.
     "letter_spacing": "normal",
     "word_spacing": "normal",
+    # READ-P2-2 (#168): focus mode off by default — opt-in, like bionic.
+    "focus_mode_enabled": False,
     # 1em ≈ one blank line between sections. Unlike the two above there is no
     # no-op value in the allow-list; sections previously had no margin-bottom,
     # so this default does slightly increase inter-section spacing.

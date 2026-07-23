@@ -81,6 +81,90 @@
        aria-hidden="true"
        style="display:none"></div>
 
+  {#
+    READ-P2-2 (#168): focus mode. Marks the passage section currently centered
+    in the viewport with `.focus-active`; style.css dims the others to
+    --reader-section-opacity (0.4 when focus mode is on, 1 when off).
+
+    Design notes:
+      - IntersectionObserver, NOT a scroll listener. The observer fires only
+        when a section crosses the centre band, so there is no per-frame work
+        and no jank — which is what the ticket's "debounce scroll with
+        requestAnimationFrame" guardrail was protecting against. rootMargin
+        collapses the viewport to a thin band at its vertical centre; whichever
+        section intersects that band is the one being read.
+      - The script adds `.focus-ready` to the surface. CSS dims ONLY when that
+        class is present, so with JS disabled nothing is dimmed and the passage
+        reads normally.
+      - Whether dimming is visible is decided purely in CSS by the server-set
+        variable, so this script does not need to know the preference or re-run
+        when it changes — the HTMX <style> swap handles it.
+      - Re-initialised on htmx:afterSwap because the bionic toggle replaces the
+        whole <article> out-of-band, which would otherwise leave the observer
+        watching detached nodes.
+  #}
+  <script>
+    (function () {
+      var observer = null;
+
+      function initFocusMode() {
+        var surface = document.getElementById("reading-surface");
+        if (!surface || !("IntersectionObserver" in window)) return;
+
+        if (observer) observer.disconnect();
+
+        var sections = surface.querySelectorAll(".reading-section");
+        if (!sections.length) return;
+
+        var active = null;
+        function setActive(el) {
+          if (el === active) return;
+          if (active) active.classList.remove("focus-active");
+          el.classList.add("focus-active");
+          active = el;
+        }
+
+        observer = new IntersectionObserver(
+          function (entries) {
+            // Prefer whichever intersecting section is nearest the viewport
+            // centre. Entries arrive only for sections that changed state, so
+            // fall back to keeping the current one when none qualify — that
+            // way exactly one section is always lit, never zero.
+            var centre = window.innerHeight / 2;
+            var best = null;
+            var bestDistance = Infinity;
+            entries.forEach(function (entry) {
+              if (!entry.isIntersecting) return;
+              var box = entry.boundingClientRect;
+              var distance = Math.abs(box.top + box.height / 2 - centre);
+              if (distance < bestDistance) {
+                bestDistance = distance;
+                best = entry.target;
+              }
+            });
+            if (best) setActive(best);
+          },
+          // A thin band across the viewport's vertical centre.
+          { rootMargin: "-45% 0px -45% 0px", threshold: 0 }
+        );
+
+        sections.forEach(function (section) {
+          observer.observe(section);
+        });
+
+        // Light the first section up front so the passage never renders with
+        // everything dimmed before the first scroll.
+        setActive(sections[0]);
+        surface.classList.add("focus-ready");
+      }
+
+      initFocusMode();
+      document.body.addEventListener("htmx:afterSwap", function (event) {
+        if (event.target && event.target.id === "reading-surface") initFocusMode();
+      });
+    })();
+  </script>
+
   <script>
     // Reflect the just-clicked preference button as `aria-pressed=true`
     // (and reset its siblings) immediately on click — without this, the

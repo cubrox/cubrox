@@ -50,7 +50,17 @@ PREFERENCE_OPTIONS: dict[str, list[Any]] = {
     # section text is `white-space: pre-wrap`, so intra-section paragraph breaks
     # are literal newlines in the source text with no element to target.
     "paragraph_spacing": ["0.5em", "1em", "1.5em", "2em"],
+    # READ-P2-2 (#168): focus mode dims passage sections other than the one
+    # centered in the viewport, reducing visual competition for readers who
+    # lose their place (PRD: sustained attention is the primary friction).
+    "focus_mode_enabled": [True, False],
 }
+
+# Preference keys whose values are booleans rather than CSS strings. Form data
+# always arrives as strings, so `coerce_value` converts 'true'/'false' for
+# these before the allow-list check. Kept as a set so adding a new toggle is a
+# one-line change rather than another branch in coerce_value.
+BOOLEAN_KEYS: frozenset[str] = frozenset({"bionic_enabled", "focus_mode_enabled"})
 
 # Friendly labels for sidebar UI section headings (the <legend> per
 # fieldset). Falls back to the title-cased key with underscores replaced
@@ -90,6 +100,8 @@ PREFERENCE_LABELS: dict[tuple[str, Any], str] = {
     ("paragraph_spacing", "1em"): "Standard",
     ("paragraph_spacing", "1.5em"): "Loose",
     ("paragraph_spacing", "2em"): "Loosest",
+    ("focus_mode_enabled", True): "On",
+    ("focus_mode_enabled", False): "Off",
 }
 
 
@@ -97,10 +109,10 @@ def coerce_value(key: str, raw: str) -> Any:
     """Coerce a Form-submitted string into the right type for the given key.
 
     Form data arrives as strings. Most preference values are stored as
-    strings already (e.g., '18px', '#ffffff', '1.6'). The exception is
-    `bionic_enabled`, which is a boolean. Returns None if coercion fails.
+    strings already (e.g., '18px', '#ffffff', '1.6'). The exceptions are
+    the boolean toggles in BOOLEAN_KEYS. Returns None if coercion fails.
     """
-    if key == "bionic_enabled":
+    if key in BOOLEAN_KEYS:
         if raw == "true":
             return True
         if raw == "false":

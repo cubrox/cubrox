@@ -26,6 +26,11 @@ dev = [
     "httpx>=0.28",
     "ruff>=0.8",
     "mypy>=1.11",
+    # Test-only PDF writer (BSD-licensed) for building synthetic PDFs with
+    # text at known positions — used by tests/test_pdf_header_footer.py to
+    # verify header/footer cropping (#169). Never imported by app/, so it is
+    # not a runtime dependency and does not touch ADR-003 (pdfplumber-only).
+    "reportlab>=4.0",
 ]
 
 [tool.ruff]
